@@ -7,6 +7,7 @@ from msmbuilder import metrics
 from msmbuilder import clustering
 from msmbuilder import Project
 from msmbuilder import Serializer
+from msmbuilder import Trajectory
 from msmbuilder.utils import format_block
 from msmbuilder.License import LicenseString
 from msmbuilder.Citation import CiteString 
@@ -121,6 +122,12 @@ add_argument(atompairs, '-m', dest='atompairs_metric', default='cityblock',
 atompairs_subparsers = atompairs.add_subparsers()
 atompairs_subparsers.metric = 'atompairs'
 
+drid = metrics_parsers.add_parser('drid')
+add_argument(drid, '-a', dest='drid_atom_indices',
+             help='atom indices to use with DRID', default='AtomIndices.dat')
+drid_subparsers = drid.add_subparsers()
+drid_subparsers.metric = 'drid'
+
 picklemetric = metrics_parsers.add_parser('custom', description="""CUSTOM: Use a custom
 distance metric. This requires defining your metric and saving it to a file using
 the pickle format, which can be done fron an interactive shell. This is an EXPERT FEATURE,
@@ -132,7 +139,7 @@ picklemetric_subparsers.metric = 'custom'
 
 ################################################################################
 
-subparsers = [rmsd_subparsers, dihedral_subparsers, lprmsd_subparsers, contact_subparsers, atompairs_subparsers, picklemetric_subparsers]
+subparsers = [rmsd_subparsers, dihedral_subparsers, lprmsd_subparsers, contact_subparsers, atompairs_subparsers, drid_subparsers, picklemetric_subparsers]
 for subparser in subparsers:
     kcenters = subparser.add_parser('kcenters') 
     kcenters.set_defaults(alg='kcenters', metric=subparser.metric)
@@ -237,6 +244,18 @@ def construct_metric(args):
             print 'Loaded custom metric:'
             print metric
             print '#'*80
+
+    elif args.metric == 'drid':
+        atom_indices = np.loadtxt(args.drid_atom_indices, np.int)
+        try:
+            from roberttools import C_DRID
+        except ImportError:
+            print >> sys.stderr, 'Could not import C_DRID from roberttools'
+            print >> sys.stderr, 'You need to install msmbuilder.sandbox/rmcgibbo/metrics'
+        
+        t = Trajectory.LoadTrajectoryFile(Project.LoadFromHDF(args.project)['ConfFilename'])
+        metric = C_DRID(t, atom_indices=atom_indices)
+
     else:
         raise Exception("Bad metric")
     

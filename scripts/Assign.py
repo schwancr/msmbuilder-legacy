@@ -95,6 +95,11 @@ microstate it is assigned to.""", formatter_class=argparse.RawDescriptionHelpFor
     add_argument(contact, '-f', dest='contact_cutoff_file', help='File containing residue specific cutoff distances (supercedes the scalar cutoff distance if present).')
     add_argument(contact, '-s', dest='contact_scheme', default='closest-heavy', help='contact scheme.',
         choices=['CA', 'cloest', 'closest-heavy'])
+
+    drid = metrics_parsers.add_parser('drid')
+    add_argument(drid, '-a', dest='drid_atom_indices',
+                 help='atom indices to use with DRID', default='AtomIndices.dat')
+
         
     picklemetric = metrics_parsers.add_parser('custom', description="""CUSTOM: Use a custom
     distance metric. This requires defining your metric and saving it to a file using
