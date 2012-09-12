@@ -2,12 +2,21 @@ import numpy as np
 import numpy.testing as npt
 from scipy.spatial.distance import squareform
 from msmbuilder.clustering import BaseFlatClusterer
-import bottleneck as bn
 import scipy.weave
-# Bottleneck is a collection of fast NumPy array
-# functions written in Cython: http://pypi.python.org/pypi/Bottleneck
-# can be installed with
-# $ pip install bottleneck
+import logging
+try:
+    import bottleneck as bn
+except ImportError:
+    print """
+Bottleneck is a collection of fast NumPy array
+functions written in Cython: http://pypi.python.org/pypi/Bottleneck
+can be installed with
+
+$ pip install bottleneck
+"""
+    raise
+    
+logger = logging.getLogger(__name__)
 
 
 ################################################################################
@@ -20,7 +29,7 @@ import scipy.weave
 
 
 class ParkKMedoids(BaseFlatClusterer):
-    def __init__(self, metric, trajectories, k=None):
+    def __init__(self, metric, trajectories, k=None, max_iters=None):
         """Run kcenters clustering algorithm.
 
         Terminates either when `k` clusters have been identified, or when every data
@@ -32,30 +41,17 @@ class ParkKMedoids(BaseFlatClusterer):
             A metric capable of handling `ptraj`
         trajectory : Trajectory or list of msmbuilder.Trajectory
             data to cluster
-        k : {int, None}
-            number of desired clusters, or None
-        distance_cutoff : {float, None}
-            Stop identifying new clusters once the distance of every data to its
-            cluster center falls below this value. Supply either this or `k`
-        seed : int, optional
-            index of the frame to use as the first cluster center
-            
-        See Also
-        --------
-        _kcenters : implementation
-        
-        References
-        ----------
-        .. [1] Beauchamp, MSMBuilder2
+        k : int
+            number of desired clusters
+        max_iters : {int, None}
+            Maximum number of iterations
+ 
         """
         
         super(KCenters, self).__init__(metric, trajectories)
         
-        gi, asgn, dl = _park_medoids(metric, self.ptraj, k)
-        
-        
-        PROBLEM: THE ASSIGNMENTS COMING FROM PARK_MEDOIDS ARE INDEXED WITH RESPECT
-        TO MEDOIDS AND NOT WITH RESPECT TO PTRAJ
+        gi, asgn, dl = _park_medoids(metric, self.ptraj, k, max_iters)
+        asgn = gi[asgn]
         
         
         
@@ -91,7 +87,15 @@ def _park_assign(d_a2a, medoids, n_frames, k):
     return membership, distances_to_medoid
 
 
-def _park_medoids(metric, ptraj, k):
+def _park_medoids(metric, ptraj, k, max_iterations=None):
+    """
+    Parameters
+    ----------
+    
+    
+    max_iterations : {int, None}
+        max # iterations, or until convergence if you supply None
+    """
     n_frames = len(ptraj)
     d_a2a = squareform(metric.all_pairwise(ptraj))
 
@@ -113,14 +117,23 @@ def _park_medoids(metric, ptraj, k):
     
     
     membership, distances_to_medoid = _park_assign(d_a2a, medoids, n_frames, k)
-    new_ssd, old_ssd = np.sum(distances_to_medoid), np.inf
-    print 'ssd', new_ssd
+    new_sd = np.sum(distances_to_medoid)
+    logger.info('Initial Clustering Score %f', new_sd)
     
-    while (new_ssd < old_ssd):
+    if max_iterations is None:
+        iterable = itertools.count(0)
+    else:
+        iterable = xrange(max_iterations)
+    
+    for i in iterable:
         medoids = _park_update(d_a2a, medoids, membership, n_frames, k)
         membership, distances_to_medoid = _park_assign(d_a2a, medoids, n_frames, k)
-        old_ssd, new_ssd = new_ssd, np.sum(distances_to_medoid)
-        print 'ssd', new_ssd
+        old_sd, new_sd = new_sd, np.sum(distances_to_medoid)
+        logger.info("Iteration %d   clustering score %f", new_sd)
+
+        if new_sd >= old_sd:
+            logger.info('Converged. Yay!')
+            break
 
     return medoids, membership, distances_to_medoid
     

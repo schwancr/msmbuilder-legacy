@@ -3,6 +3,7 @@
 import sys, os
 import pickle
 from pprint import pprint
+from argparse import RawDescriptionHelpFormatter
 from msmbuilder import arglib
 from msmbuilder import metrics
 from msmbuilder import clustering
@@ -10,7 +11,7 @@ from msmbuilder import Project
 from msmbuilder import Serializer
 from msmbuilder.utils import format_block
 from msmbuilder.License import LicenseString
-from msmbuilder.Citation import CiteString 
+from msmbuilder.Citation import CiteString
 from msmbuilder.arglib import ensure_path_exists, die_if_path_exists
 import numpy as np
 import logging
@@ -80,7 +81,18 @@ for metric_parser in parser.metric_parsers: # arglib stores the metric subparser
     add_argument(hybrid_cutoff, '-d', help='no greater cophenetic distance than this cutoff',
         type=float, dest='hybrid_distance_cutoff')
     
-
+    park = subparser.add_parser('park', description="""
+################################################################################
+#          A simple and fast algorithm for K-medoids clustering                #
+#          Hae-Sang Park, Chi-Hyuck Jun                                        #
+#          Expert Systems with Applications 36 (2009) 3336-3341                #
+################################################################################
+    """, formatter_class=RawDescriptionHelpFormatter)
+    park_cutoff = park.add_argument_group('required').add_mutually_exclusive_group(required=True)
+    add_argument(park_cutoff, '-k', help='number of clusters', type=int, dest='park_num_clusters')
+    add_argument(park, '-n', help='number of iterations. -1 goes until convergence', type=int,
+        dest='park_num_iters', default=-1)
+    
     clarans = subparser.add_parser('clarans')
     claransR = clarans.add_argument_group('required')
     add_argument(claransR, '-k', help='number of clusters',
@@ -136,6 +148,14 @@ def cluster(metric, trajs, args):
             global_num_iters=args.hybrid_global_iters,
             too_close_cutoff=args.hybrid_too_close_cutoff,
             ignore_max_objective=args.hybrid_ignore_max_objective)
+        
+    elif args.alg == 'park':
+        from msmbuilder import park_kmedoids
+        if args.park_num_iters == -1:
+            args.park_num_iters = None
+        clusterer = park_kmedoids.ParkKMedoids(metric, trajs, k=args.park_num_clusters,
+            max_iters=args.park_num_iters)
+        
     elif args.alg == 'clarans':
         clusterer = clustering.Clarans(metric, trajs, k=args.clarans_num_clusters,
             num_local_minima=args.clarans_num_local_minima,
