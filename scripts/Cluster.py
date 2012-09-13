@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys, os
-import warnings
+from argparse import RawDescriptionHelpFormatter
 from msmbuilder import arglib
 from msmbuilder import clustering
 from msmbuilder import Project
