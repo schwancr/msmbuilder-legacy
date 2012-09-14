@@ -52,7 +52,7 @@ from msmbuilder import Trajectory
 from msmbuilder import Conformation
 from msmbuilder import Serializer
 from msmbuilder import MSMLib
-from msmbuilder import transition_path_theory
+from msmbuilder import tpt
 
 ### Local Imports ###
 #from msmbuilder.scripts import Assign

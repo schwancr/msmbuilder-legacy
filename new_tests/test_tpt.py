@@ -6,7 +6,7 @@ import numpy.testing as npt
 import scipy.sparse
 from scipy import io
 
-from msmbuilder import transition_path_theory as tpt
+from msmbuilder import tpt
 from msmbuilder import Serializer
 from common import reference_dir
 

@@ -24,7 +24,7 @@ import numpy as np
 import os
 import scipy.io
 
-from msmbuilder import transition_path_theory as tpt
+from msmbuilder import tpt
 from msmbuilder import Serializer
 from msmbuilder import arglib
 import logging

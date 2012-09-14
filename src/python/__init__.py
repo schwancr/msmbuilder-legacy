@@ -35,7 +35,7 @@ __all__ = [
 "Conformation", 
 "CopernicusProject",
 "CreateMergedTrajectoriesFromFAH",
-"FahProject",
+"fahproject",
 "metrics", 
 "MSMLib",
 "lumping", 
@@ -59,4 +59,3 @@ from Conformation import ConformationBaseClass
 from Conformation import Conformation
 from Trajectory import Trajectory
 from Project import Project
-from FahProject import FahProject
