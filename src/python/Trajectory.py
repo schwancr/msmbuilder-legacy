@@ -24,9 +24,9 @@ import os
 import tables
 import numpy as np
 
-from Bio.PDB.PDBParser import PDBParser
+import Bio.PDB
 from msmbuilder import Serializer
-from msmbuilder import ConformationBaseClass, Conformation
+from msmbuilder import Conformation
 from msmbuilder import xtc
 from msmbuilder import dcd
 
@@ -59,7 +59,7 @@ def _convert_from_lossy_integers(X, precision):
     return(X2)
 
 
-class Trajectory(ConformationBaseClass):
+class Trajectory(Serializer):
     """This is the representation of a sequence of  conformations.
 
     Notes:
@@ -267,11 +267,50 @@ class Trajectory(ConformationBaseClass):
         Notes
         -----
         Don't use this for a very big trajectory. PDB is plaintext and takes a lot
-        of memory
+        of memory.  This function ignores elements because the BioPython PBB
+        writer is broken.
         """
-
-        for i in range(len(self["XYZList"])):
-            PDB.WritePDBConformation(Filename, self["AtomID"], self["AtomNames"], self["ResidueNames"], self["ResidueID"], self["XYZList"][i], self["ChainID"])
+        
+        b = Bio.PDB.StructureBuilder.StructureBuilder()
+        s = Bio.PDB.Structure.Structure(2)
+        b.init_structure(s)
+        
+        
+        for frame_ind in xrange(self["XYZList"].shape[0]):
+        
+            m = Bio.PDB.Model.Model(1)
+            b.init_model(m)
+            already_added_chain = False
+        
+            for indices in self["IndexList"]:
+                already_added_residue = False
+        
+                for i in indices:
+                    name = self["name"][i]
+                    chainid = self["chainid"][i]
+                    tempFactor = self["tempFactor"][i]
+                    altLoc = self["altLoc"][i]
+                    occupancy = self["occupancy"][i]
+                    element = self["element"][i]
+                    resSeq = self["resSeq"][i]
+                    resName = self["resName"][i]
+                    xyz = self["XYZList"][frame_ind, i]
+        
+                    if already_added_chain == False:
+                        b.init_chain(chainid)
+                        b.init_seg("1")
+                        already_added_chain = True
+        
+                    if already_added_residue == False:
+                        b.init_residue(resName," ",resSeq," ")
+                        already_added_residue = True
+                    fullname = name
+                    b.init_atom(name,xyz,tempFactor,occupancy,altLoc,fullname,element)
+                    b.atom.element = ""  #This is a hack to fix the brokenness of BioPython.PDB, which automatically assigns BROKEN elements               
+        
+        io = Bio.PDB.PDBIO()
+        io.set_structure(b.structure)    
+        io.save(Filename)
 
     def save_to_xyz(self, Filename):
         """Dump the coordinates to XYZ format
@@ -357,32 +396,49 @@ class Trajectory(ConformationBaseClass):
         filename : str
             location to load from
         """
-        parser = PDBParser(QUIET=True)
+        parser = Bio.PDB.PDBParser(QUIET=True)
         structure = parser.get_structure("test", filename)
-        model = structure[0]
+
+        model = structure[0]        
+        
         pdb_dict = dict([(key,[]) for key in Trajectory.required_keys])
+        pdb_dict["XYZList"] = [[]]
         
         for chain in model.child_list:
             chain_id = chain.id
             for res in chain.child_list:
                 res_id = int(res.id[1])
                 for a in res.child_list:
-                    pdb_dict["XYZList"].append(a.coord)
+                    pdb_dict["XYZList"][0].append(a.coord)
                     pdb_dict["name"].append(a.name)
                     pdb_dict["element"].append(a.element)
+                    pdb_dict["element"].append("")
                     pdb_dict["serial"].append(a.serial_number)
                     pdb_dict["tempFactor"].append(a.bfactor)
                     pdb_dict["occupancy"].append(a.occupancy)
                     pdb_dict["chainid"].append(chain_id)
                     pdb_dict["resName"].append(res.resname)
                     pdb_dict["resSeq"].append(res_id)
+                    pdb_dict["altLoc"].append(a.altloc)
 
         for key,val in pdb_dict.iteritems():
             if key not in ["IndexList"]:
                 pdb_dict[key] = np.array(val)
             
-        pdb_dict["resName"] = pdb_dict["resName"].astype("S4")        
-        return(Trajectory(pdb_dict))
+        pdb_dict["resName"] = pdb_dict["resName"].astype("S4")
+        
+        for i,model in enumerate(structure):
+            if i == 0: continue  # Already taken care of
+            pdb_dict["XYZList"].append([])
+            for chain in model.child_list:
+                chain_id = chain.id
+                for res in chain.child_list:
+                    res_id = int(res.id[1])
+                    for a in res.child_list:
+                        pdb_dict["XYZList"][-1].append(a.coord)
+        
+        R = Trajectory(pdb_dict)
+        return R
 
     @classmethod
     def load_from_xtc(cls, XTCFilenameList, PDBFilename=None, Conf=None, PreAllocate=True,
