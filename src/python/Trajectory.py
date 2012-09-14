@@ -38,7 +38,7 @@ MAXINT16=np.iinfo(np.int16).max
 MAXINT32=np.iinfo(np.int32).max
 default_precision = 1000
 
-def _ConvertToLossyIntegers(X,Precision):
+def _convert_to_lossy_integers(X,Precision):
     """Implementation of the lossy compression used in Gromacs XTC using the pytables library.  Convert 32 bit floats into 16 bit integers.  These conversion functions have been optimized for memory use.  Further memory reduction would require an in-place astype() operation, which one could create using ctypes."""
     if np.max(X)*float(Precision)< MAXINT16 and np.min(X)*float(Precision) > -MAXINT16:
         X*=float(Precision)
@@ -51,7 +51,7 @@ def _ConvertToLossyIntegers(X,Precision):
         logger.error("Data range too large for int16: try removing center of mass motion, check for 'blowing up, or just use .h5 or .xtc format.'")
     return(Rounded)
 
-def _ConvertFromLossyIntegers(X,Precision):
+def _convert_from_lossy_integers(X,Precision):
     """Implementation of the lossy compression used in Gromacs XTC using the pytables library.  Convert 16 bit integers into 32 bit floats."""
     X2=X.astype("float32")
     X2/=float(Precision)
@@ -61,7 +61,7 @@ class Trajectory(ConformationBaseClass):
     """This is the representation of a sequence of  conformations.
 
     Notes:
-    Use classmethod LoadFromPDB to create an instance of this class from a PDB filename.
+    Use classmethod load_from_pdb to create an instance of this class from a PDB filename.
     The Trajectory is a dictionary-like object.
     The dictionary key 'XYZList' contains a numpy array of XYZ coordinates, stored such that
     X[i,j,k] gives Frame i, Atom j, Coordinate k.
@@ -82,9 +82,9 @@ class Trajectory(ConformationBaseClass):
         
         See Also
         --------
-        LoadFromPDB
-        LoadFromHDF
-        LoadFromLHDF
+        load_from_pdb
+        load_from_hdf
+        load_from_lhdf
         """
         
         ConformationBaseClass.__init__(self,S)
@@ -164,12 +164,12 @@ class Trajectory(ConformationBaseClass):
             self['XYZList'] = np.vstack((self['XYZList'],other['XYZList']))
         return self
  
-    def RestrictAtomIndices(self, AtomIndices):
-        ConformationBaseClass.RestrictAtomIndices(self, AtomIndices )
+    def restrict_atom_indices(self, AtomIndices):
+        ConformationBaseClass.restrict_atom_indices(self, AtomIndices )
 
         self['XYZList'] = copy.copy( self['XYZList'][:, AtomIndices] )
 
-    def SaveToLHDF(self,Filename,Precision=default_precision):
+    def save_to_lhdf(self,Filename,Precision=default_precision):
         """Save a Trajectory instance to a Lossy HDF File.
         
         First, remove the XYZList key because it should be written using the
@@ -187,12 +187,12 @@ class Trajectory(ConformationBaseClass):
         key="XYZList"
         X=self.pop(key)
         Serializer.SaveToHDF(self,Filename)
-        Rounded=_ConvertToLossyIntegers(X,Precision)
+        Rounded=_convert_to_lossy_integers(X,Precision)
         self[key]=Rounded
         Serializer.SaveEntryAsEArray(self[key],key,Filename=Filename)
         self[key]=X
         
-    def SaveToXTC(self,Filename,Precision=default_precision):
+    def save_to_xtc(self,Filename,Precision=default_precision):
         """Dump the coordinates to XTC
         
         Parameters
@@ -208,7 +208,7 @@ class Trajectory(ConformationBaseClass):
         for i in range(len(self["XYZList"])):
             XTCFile.write(self["XYZList"][i],1,i,np.eye(3,3,dtype='float32'),Precision)
         
-    def SaveToPDB(self,Filename):
+    def save_to_pdb(self,Filename):
         """Dump the coordinates to PDB
         
         Parameters
@@ -225,7 +225,7 @@ class Trajectory(ConformationBaseClass):
         for i in range(len(self["XYZList"])):
             PDB.WritePDBConformation(Filename,self["AtomID"], self["AtomNames"],self["ResidueNames"],self["ResidueID"],self["XYZList"][i],self["ChainID"])
 
-    def SaveToXYZ(self,Filename):
+    def save_to_xyz(self,Filename):
         """Dump the coordinates to XYZ format
         
         Parameters
@@ -239,7 +239,7 @@ class Trajectory(ConformationBaseClass):
         """
         
         Answer = []
-        Title = 'From MSMBuilder SaveToXYZ funktion'
+        Title = 'From MSMBuilder save_to_xyz funktion'
         for i in range(len(self["XYZList"])):
             xyz = self["XYZList"][i]
             na = xyz.shape[0]
@@ -251,7 +251,7 @@ class Trajectory(ConformationBaseClass):
             Answer[i] += "\n"
         with open(Filename,'w') as f: f.writelines(Answer)
 
-    def Save(self,Filename,Precision=default_precision):
+    def save(self,Filename,Precision=default_precision):
         """Dump the coordinates to disk in format auto-detected by filename
         
         Parameters
@@ -269,13 +269,13 @@ class Trajectory(ConformationBaseClass):
         if extension == '.h5':
             self.SaveToHDF(Filename)
         elif extension == '.xtc':
-            self.SaveToXTC(Filename)
+            self.save_to_xtc(Filename)
         elif extension == '.pdb':
-            self.SaveToPDB(Filename)
+            self.save_to_pdb(Filename)
         elif extension == '.lh5':
-            self.SaveToLHDF(Filename,Precision=Precision)
+            self.save_to_lhdf(Filename,Precision=Precision)
         elif extension == '.xyz':
-            self.SaveToXYZ(Filename)
+            self.save_to_xyz(Filename)
         else:
             raise IOError("File: %s. I don't understand the extension '%s'" % (Filename, extension))
                     
@@ -292,7 +292,7 @@ class Trajectory(ConformationBaseClass):
             self["XYZList"]=self["XYZList"].tolist()
         except:
             pass
-        C1=Conformation.LoadFromPDB(Filename)
+        C1=Conformation.load_from_pdb(Filename)
         Temp=C1["XYZ"]
         if len(Temp)!=len(self["XYZList"][0]):
             raise NameError("Tried to add wrong number of coordinates.")
@@ -301,7 +301,7 @@ class Trajectory(ConformationBaseClass):
 
     
     @classmethod
-    def LoadFromPDB(cls,Filename):       
+    def load_from_pdb(cls,Filename):       
         """Create a Trajectory from a PDB Filename
         
         Parameters
@@ -313,7 +313,7 @@ class Trajectory(ConformationBaseClass):
 
     
     @classmethod
-    def LoadFromXTC(cls, XTCFilenameList, PDBFilename=None, Conf=None, PreAllocate=True,
+    def load_from_xtc(cls, XTCFilenameList, PDBFilename=None, Conf=None, PreAllocate=True,
                     JustInspect=False, discard_overlapping_frames=False):
         """Create a Trajectory from a collection of XTC files
 
@@ -343,7 +343,7 @@ class Trajectory(ConformationBaseClass):
             then just the shape
         """        
         if PDBFilename!=None:
-            A=Trajectory.LoadFromPDB(PDBFilename)
+            A=Trajectory.load_from_pdb(PDBFilename)
         elif Conf!=None:
             A=Trajectory(Conf)
         else:
@@ -384,11 +384,11 @@ class Trajectory(ConformationBaseClass):
 
     
     @classmethod
-    def LoadFromDCD(cls,FilenameList,PDBFilename=None,Conf=None,PreAllocate=True,JustInspect=False):       
+    def load_from_dcd(cls,FilenameList,PDBFilename=None,Conf=None,PreAllocate=True,JustInspect=False):       
         """Create a Trajectory from a Filename."""
         
         if PDBFilename!=None:
-            A=Trajectory.LoadFromPDB(PDBFilename)
+            A=Trajectory.load_from_pdb(PDBFilename)
         elif Conf!=None:
             A=Trajectory(Conf)
         else:
@@ -409,10 +409,10 @@ class Trajectory(ConformationBaseClass):
         return(A)
     
     @classmethod
-    def LoadFromTRR(cls,TRRFilenameList,PDBFilename=None,Conf=None,PreAllocate=True,JustInspect=False):       
+    def load_from_trr(cls,TRRFilenameList,PDBFilename=None,Conf=None,PreAllocate=True,JustInspect=False):       
         """Create a Trajectory with title Title from a Filename."""
         if PDBFilename!=None:
-            A=Trajectory.LoadFromPDB(PDBFilename)
+            A=Trajectory.load_from_pdb(PDBFilename)
         elif Conf!=None:
             A=Trajectory(Conf)
         else:
@@ -440,23 +440,23 @@ class Trajectory(ConformationBaseClass):
     
 
     @classmethod
-    def LoadFromPDBList(cls,Filenames):       
+    def load_from_pdbList(cls,Filenames):       
         """Create a Trajectory with title Title from a Filename."""
-        A=Trajectory.LoadFromPDB(Filenames[0])
+        A=Trajectory.load_from_pdb(Filenames[0])
         for f in Filenames[1:]:
             A.AppendPDB(f)
         A["XYZList"]=np.array(A["XYZList"])
         return(A)
     
     @classmethod
-    def EnumChunksFromHDF(cls,TrajFilename,Stride=None,AtomIndices=None,ChunkSize=50000):
+    def enum_chunks_from_hdf(cls,TrajFilename,Stride=None,AtomIndices=None,ChunkSize=50000):
         """
         Function to read trajectory files which have been saved as HDF.
 
         This function is an iterable, so should be used like:
 
         from msmbuilder import Trajectory
-        for trajectory_chunk in Trajectory.EnumChunksFromHDF( 
+        for trajectory_chunk in Trajectory.enum_chunks_from_hdf( 
             ... # Do something with each chunk. The chunk looks like a regular Trajectory instance
 
         Inputs:
@@ -526,15 +526,15 @@ class Trajectory(ConformationBaseClass):
         return
 
     @classmethod
-    def EnumChunksFromLHDF(cls, TrajFilename, Precision=default_precision, Stride=None, AtomIndices=None, ChunkSize=50000):
+    def enum_chunks_from_lhdf(cls, TrajFilename, Precision=default_precision, Stride=None, AtomIndices=None, ChunkSize=50000):
         """
         Method to read trajectory files which have been saved as LHDF.
-        Note that this method simply calls the EnumChunksFromHDF method.
+        Note that this method simply calls the enum_chunks_from_hdf method.
 
         This function is an iterable, so should be used like:
 
         from msmbuilder import Trajectory
-        for trajectory_chunk in Trajectory.EnumChunksFromLHDF( 
+        for trajectory_chunk in Trajectory.enum_chunks_from_lhdf( 
             ... # Do something with each chunk. The chunk looks like a regular Trajectory instance
 
         Inputs:
@@ -549,14 +549,14 @@ class Trajectory(ConformationBaseClass):
         Outputs:
         - Nothing. This is an iterable function, so it yields Trajectory instances
         """
-        for A in cls.EnumChunksFromHDF( TrajFilename, Stride, AtomIndices, ChunkSize ):
-            A['XYZList'] = _ConvertFromLossyIntegers( A['XYZList'], Precision )
+        for A in cls.enum_chunks_from_hdf( TrajFilename, Stride, AtomIndices, ChunkSize ):
+            A['XYZList'] = _convert_from_lossy_integers( A['XYZList'], Precision )
             yield A
 
         return
 
     @classmethod
-    def LoadFromHDF(cls, TrajFilename, JustInspect=False, Stride=None, AtomIndices=None, ChunkSize=50000 ):
+    def load_from_hdf(cls, TrajFilename, JustInspect=False, Stride=None, AtomIndices=None, ChunkSize=50000 ):
         """
         Method to load a trajectory which was saved as HDF
         
@@ -574,7 +574,7 @@ class Trajectory(ConformationBaseClass):
         - A : Trajectory instance read from disk
         """
         if not JustInspect:
-            chunk_list = list( cls.EnumChunksFromHDF( TrajFilename, Stride=Stride, AtomIndices=AtomIndices, ChunkSize=ChunkSize ) )
+            chunk_list = list( cls.enum_chunks_from_hdf( TrajFilename, Stride=Stride, AtomIndices=AtomIndices, ChunkSize=ChunkSize ) )
             A = chunk_list[0]
             A['XYZList'] = np.concatenate([ t['XYZList'] for t in chunk_list ])
             return A
@@ -586,7 +586,7 @@ class Trajectory(ConformationBaseClass):
             return(Shape)
 
     @classmethod        
-    def LoadFromLHDF(cls, TrajFilename, JustInspect=False, Precision=default_precision, Stride=None, AtomIndices=None, ChunkSize=50000 ):
+    def load_from_lhdf(cls, TrajFilename, JustInspect=False, Precision=default_precision, Stride=None, AtomIndices=None, ChunkSize=50000 ):
         """
         Method to load a trajectory which was saved as LHDF
         
@@ -605,8 +605,8 @@ class Trajectory(ConformationBaseClass):
         - A : Trajectory instance read from disk
         """ 
         if not JustInspect:
-            A = cls.LoadFromHDF( TrajFilename, Stride=Stride, AtomIndices=AtomIndices )
-            A['XYZList'] = _ConvertFromLossyIntegers( A['XYZList'], Precision )
+            A = cls.load_from_hdf( TrajFilename, Stride=Stride, AtomIndices=AtomIndices )
+            A['XYZList'] = _convert_from_lossy_integers( A['XYZList'], Precision )
             return A
 
         else:
@@ -616,7 +616,7 @@ class Trajectory(ConformationBaseClass):
             return(Shape)
 
     @classmethod
-    def ReadXTCFrame(cls,TrajFilename,WhichFrame):
+    def read_xtc_frame(cls,TrajFilename,WhichFrame):
         """Read a single frame from XTC trajectory file without loading file into memory."""
         i=0
         for c in xtc.XTCReader(TrajFilename):
@@ -626,7 +626,7 @@ class Trajectory(ConformationBaseClass):
         raise Exception("Frame %d not found in file %s; last frame found was %d"%(WhichFrame,cls.TrajFilename,i))
     
     @classmethod
-    def ReadDCDFrame(cls, TrajFilename, WhichFrame):
+    def read_dcd_frame(cls, TrajFilename, WhichFrame):
         """Read a single frame from DCD trajectory without loading file into memory."""
         reader = dcd.DCDReader(TrajFilename, firstframe=WhichFrame, lastframe=WhichFrame)
         xyz = None
@@ -639,7 +639,7 @@ class Trajectory(ConformationBaseClass):
         
     
     @classmethod
-    def ReadHDF5Frame(cls,TrajFilename,WhichFrame):
+    def read_hdf_frame(cls,TrajFilename,WhichFrame):
         """Read a single frame from HDF5 trajectory file without loading file into memory."""
         F1=tables.File(TrajFilename)
         XYZ=F1.root.XYZList[WhichFrame]
@@ -648,61 +648,61 @@ class Trajectory(ConformationBaseClass):
     
     
     @classmethod
-    def ReadLHDF5Frame(cls,TrajFilename,WhichFrame,Precision=default_precision):
+    def read_lhdf_frame(cls,TrajFilename,WhichFrame,Precision=default_precision):
         """Read a single frame from Lossy LHDF5 trajectory file without loading file into memory."""
         F1=tables.File(TrajFilename)
         XYZ=F1.root.XYZList[WhichFrame]
         F1.close()
-        XYZ=_ConvertFromLossyIntegers(XYZ,Precision)
+        XYZ=_convert_from_lossy_integers(XYZ,Precision)
         return(XYZ)
     
     
     @classmethod
-    def ReadFrame(cls, TrajFilename, WhichFrame, Conf=None):
+    def read_frame(cls, TrajFilename, WhichFrame, Conf=None):
         extension = os.path.splitext(TrajFilename)[1]
     
         if extension == '.xtc':
-            return(Trajectory.ReadXTCFrame(TrajFilename, WhichFrame))
+            return(Trajectory.read_xtc_frame(TrajFilename, WhichFrame))
         elif extension == '.h5':
-            return(Trajectory.ReadHDF5Frame(TrajFilename, WhichFrame))
+            return(Trajectory.read_hdf_frame(TrajFilename, WhichFrame))
         elif extension == '.lh5':
-            return(Trajectory.ReadLHDF5Frame(TrajFilename, WhichFrame))
+            return(Trajectory.read_lhdf_frame(TrajFilename, WhichFrame))
         elif extension == '.dcd':
-            return(Trajectory.ReadDCDFrame(TrajFilename, WhichFrame))
+            return(Trajectory.read_dcd_frame(TrajFilename, WhichFrame))
         else:
             raise IOError("Incorrect file type--cannot get conformation %s" % TrajFilename)
     
     
     @classmethod
-    def LoadTrajectoryFile(cls, Filename, JustInspect=False, Conf=None, Stride=1):
+    def load_trajectory_file(cls, Filename, JustInspect=False, Conf=None, Stride=1):
         """Loads a trajectory into memory, automatically deciding which methods to call based on filetype.  For XTC files, this method uses a pre-registered Conformation filename as a pdb."""
         extension = os.path.splitext(Filename)[1]
         
         if extension == '.h5':
-            return Trajectory.LoadFromHDF(Filename, JustInspect=JustInspect, Stride=Stride)
+            return Trajectory.load_from_hdf(Filename, JustInspect=JustInspect, Stride=Stride)
             
         elif extension == '.xtc':
             if Conf==None:
                 raise Exception("Need to register a Conformation to use XTC Reader.")
-            return Trajectory.LoadFromXTC(Filename, Conf=Conf, JustInspect=JustInspect)[::Stride]
+            return Trajectory.load_from_xtc(Filename, Conf=Conf, JustInspect=JustInspect)[::Stride]
             
         elif extension == '.dcd':
             if Conf==None:
                 raise Exception("Need to register a Conformation to use DCD Reader.")
-            return Trajectory.LoadFromDCD(Filename, Conf=Conf, JustInspect=JustInspect)[::Stride]
+            return Trajectory.load_from_dcd(Filename, Conf=Conf, JustInspect=JustInspect)[::Stride]
             
         elif extension == '.lh5':
-            return Trajectory.LoadFromLHDF(Filename, JustInspect=JustInspect, Stride=Stride)
+            return Trajectory.load_from_lhdf(Filename, JustInspect=JustInspect, Stride=Stride)
             
         elif extension == '.pdb':
-            return Trajectory.LoadFromPDB(Filename)[::Stride]
+            return Trajectory.load_from_pdb(Filename)[::Stride]
             
         else:
             raise IOError("File: %s. I don't understand the extension '%s'" % (Filename, extension))
     
     
     @classmethod
-    def AppendFramesToFile(cls, filename, XYZList, precision=default_precision,
+    def append_frames_to_file(cls, filename, XYZList, precision=default_precision,
                            discard_overlapping_frames=False):
         """Append an array of XYZ data to an existing .h5 or .lh5 file.
         """
@@ -721,7 +721,7 @@ class Trajectory(ConformationBaseClass):
         if extension == ".h5":
             z = XYZList
         elif extension == ".lh5":
-            z = _ConvertToLossyIntegers(XYZList,precision)
+            z = _convert_to_lossy_integers(XYZList,precision)
 
         # right now this only checks for the last written frame
         if discard_overlapping_frames:

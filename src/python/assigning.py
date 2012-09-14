@@ -18,8 +18,8 @@ def _setup_containers(assignments_path, distances_path, num_trajs, longest):
     all_assignments = -1 * np.ones((num_trajs, longest), dtype=np.int)
     
     if os.path.exists(assignments_path) and os.path.exists(distances_path):
-        s = Serializer.LoadFromHDF(assignments_path)
-        t = Serializer.LoadFromHDF(distances_path)
+        s = Serializer.load_from_hdf(assignments_path)
+        t = Serializer.load_from_hdf(distances_path)
         all_distances = s['Data']
         all_assignments = t['Data']
         
@@ -142,7 +142,7 @@ def streaming_assign_with_checkpoint(metric, project, generators, assignments_pa
         distances = []
         assignments = []       
 
-        for chunk_trj in Trajectory.EnumChunksFromLHDF( project.GetTrajFilename(i), ChunkSize=chunk_size ):
+        for chunk_trj in Trajectory.enum_chunks_from_lhdf( project.GetTrajFilename(i), ChunkSize=chunk_size ):
 
             print "Chunked."
             chunk_ptraj = metric.prepare_trajectory( chunk_trj )

@@ -357,7 +357,7 @@ class Serializer(dict):
         warnings.warn(msg, DeprecationWarning, stacklevel=2)
         self.save_to_hdf(self, *args, **kwargs)
     
-    def LoadFromHDF(self, *args, **kwargs):
+    def load_from_hdf(self, *args, **kwargs):
         msg = ('This function name is depricated, use load_from_hdf '
                'instead. This alias will be removed in version 2.7')
         warnings.warn(msg, DeprecationWarning, stacklevel=2)

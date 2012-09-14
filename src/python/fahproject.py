@@ -174,7 +174,7 @@ class FahProject(object):
         load_memory_state
         """
 
-        project_info = Project.LoadFromHDF( projectinfo_file )
+        project_info = Project.load_from_hdf( projectinfo_file )
         project_info["Memory"] = cPickle.dumps( self.memory )
         project_info.SaveToHDF( projectinfo_file, do_file_check=False )
 
@@ -202,7 +202,7 @@ class FahProject(object):
 
         logger.info("Loading memory state from: %s", projectinfo_file)
 
-        project_info = Project.LoadFromHDF( projectinfo_file )
+        project_info = Project.load_from_hdf( projectinfo_file )
         self.memory = cPickle.loads( project_info["Memory"] )
 
         return
@@ -601,7 +601,7 @@ class _retrieve(object):
 
         try:
             # [this should check for and discard overlapping snapshots]
-            trajectory = Trajectory.LoadFromXTC(xtc_file_paths, PDBFilename=self.pdb_topology,
+            trajectory = Trajectory.load_from_xtc(xtc_file_paths, PDBFilename=self.pdb_topology,
                                                 discard_overlapping_frames=True)
         except IOError as e:
             logger.error("IOError (%s) when processing trajectory in clone_dir = %s", e, clone_dir)
@@ -613,7 +613,7 @@ class _retrieve(object):
                 return
 
             try:
-                trajectory = Trajectory.LoadFromXTC(xtc_file_paths[0:-1], PDBFilename=self.pdb_topology)
+                trajectory = Trajectory.load_from_xtc(xtc_file_paths[0:-1], PDBFilename=self.pdb_topology)
             except IOError:
                 logger.error("Unfortunately, the error remained even after ignoring the final frame.")
                 logger.error("Skipping the trajectory in clone_dir = %s", clone_dir)
@@ -624,7 +624,7 @@ class _retrieve(object):
         if max_rmsd is not None:
             atomindices = [ int(i)-1 for i in trajectory['AtomID'] ]
             rmsdmetric = RMSD(atomindices, omp_parallel=omp_parallel_rmsd)
-            ppdb = rmsdmetric.prepare_trajectory(Trajectory.LoadTrajectoryFile(self.pdb_topology))
+            ppdb = rmsdmetric.prepare_trajectory(Trajectory.load_trajectory_file(self.pdb_topology))
             ptraj = rmsdmetric.prepare_trajectory(trajectory)
             rmsds = rmsdmetric.one_to_all(ppdb, ptraj, 0)
 
@@ -644,7 +644,7 @@ class _retrieve(object):
             assert os.path.exists( output_filename )
 
             # load the traj and extend it [this should check for and discard overlapping snapshots]
-            Trajectory.AppendFramesToFile( output_filename,
+            Trajectory.append_frames_to_file( output_filename,
                                            trajectory['XYZList'][::stride],
                                            discard_overlapping_frames=True )
 
@@ -661,7 +661,7 @@ class _retrieve(object):
 
             # stide and discard by snapshot
             trajectory['XYZList'] = trajectory['XYZList'][::stride]
-            trajectory.Save(output_file_path)
+            trajectory.save(output_file_path)
 
             num_xtcs_processed = len(xtc_file_paths)
 

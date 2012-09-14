@@ -94,9 +94,9 @@ class TestWrappers(unittest.TestCase):
         shutil.copy(PDBFn,"./")
                     #def run(projectfn, PDBfn, InputDir, source, mingen, stride, rmsd_cutoff,  parallel='None'):
         ConvertDataToHDF.run(ProjectFn, PDBFn, TutorialDir+"/XTC", "file", 0, 1, 0,1000000)
-        P1 = Project.LoadFromHDF(ProjectFn)
+        P1 = Project.load_from_hdf(ProjectFn)
         
-        r_P1 = Project.LoadFromHDF(os.path.abspath(os.path.join('..', ReferenceDir, ProjectFn)))
+        r_P1 = Project.load_from_hdf(os.path.abspath(os.path.join('..', ReferenceDir, ProjectFn)))
         
         #self.assertEqual(P1['ConfFilename'], r_P1['ConfFilename'])
         self.assertEqual(P1['NumTrajs'], r_P1['NumTrajs'])
@@ -130,8 +130,8 @@ class TestWrappers(unittest.TestCase):
             pass
 
         
-        G   = Trajectory.LoadTrajectoryFile(GensPath)
-        r_G = Trajectory.LoadTrajectoryFile(ReferenceDir +'/'+ GensPath)
+        G   = Trajectory.load_trajectory_file(GensPath)
+        r_G = Trajectory.load_trajectory_file(ReferenceDir +'/'+ GensPath)
         self.assert_trajectories_equal(G, r_G)
 
     def test_d_Assign(self):
@@ -197,10 +197,10 @@ class TestWrappers(unittest.TestCase):
 
     def test_g_GetRandomConfs(self):
         # This one is tricky since it is stochastic...
-        P1 = Project.LoadFromHDF(ProjectFn)
+        P1 = Project.load_from_hdf(ProjectFn)
         Assignments = Serializer.LoadData("Data/Assignments.Fixed.h5")
         GetRandomConfs.run(P1, Assignments, NumRandomConformations, "2RandomConfs.lh5", 'lh5')
-        Trajectory.LoadTrajectoryFile("2RandomConfs.lh5")
+        Trajectory.load_trajectory_file("2RandomConfs.lh5")
         # Kyle: you may have a good idea for the efficient testing of this
 
     def test_h_CalculateClusterRadii(self):
@@ -215,8 +215,8 @@ class TestWrappers(unittest.TestCase):
         numpy.testing.assert_array_almost_equal(cr, cr_r)
 
     def test_i_CalculateRMSD(self):
-        #C1   = Conformation.Conformation.LoadFromPDB(PDBFn)
-        #Traj = Trajectory.LoadTrajectoryFile("Data/Gens.lh5")
+        #C1   = Conformation.Conformation.load_from_pdb(PDBFn)
+        #Traj = Trajectory.load_trajectory_file("Data/Gens.lh5")
         #AInd = np.loadtxt("AtomIndices.dat", int)
         #CalculateRMSD.run(C1, Traj, AInd, "RMSD.dat")
         outpath = os.path.join(WorkingDir, "RMSD_Gens.h5")
@@ -254,8 +254,8 @@ class TestWrappers(unittest.TestCase):
         numpy.testing.assert_array_almost_equal(ma, ma_r)
 
     def test_k_CalculateProjectRMSD(self):
-        #C1 = Conformation.LoadFromPDB(PDBFn)
-        #P1 = Project.LoadFromHDF(ProjectFn)
+        #C1 = Conformation.load_from_pdb(PDBFn)
+        #P1 = Project.load_from_hdf(ProjectFn)
         #AInd=np.loadtxt("AtomIndices.dat", int)
         #CalculateProjectRMSD.run(C1,P1,AInd,"RMSD.h5")
         outpath = os.path.join(WorkingDir, "RMSD.h5")

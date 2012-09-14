@@ -41,7 +41,7 @@ class TestSerializer(unittest.TestCase):
         hdfFile.flush()
         hdfFile.close()
         
-    def test2_LoadFromHDF(self):
+    def test2_load_from_hdf(self):
         """Load HDF5 file from (0) and verify correctness."""
         TestData=Serializer.LoadData(Filename1)        
         # check correctness or raise error

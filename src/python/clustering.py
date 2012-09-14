@@ -843,7 +843,7 @@ class Hierarchical(object):
         ------
         TODO: Probablt raises something if filename doesn't exist?
         """
-        s = Serializer.LoadFromHDF(filename)
+        s = Serializer.load_from_hdf(filename)
         Z, traj_lengths = s['z_matrix'], s['traj_lengths']
         #Next two lines are a hack to fix Serializer bug. KAB
         if np.rank(traj_lengths)==0:
