@@ -24,7 +24,7 @@ import os
 import tables
 import numpy as np
 
-from msmbuilder import PDB
+from Bio.PDB.PDBParser import PDBParser
 from msmbuilder import Serializer
 from msmbuilder import ConformationBaseClass, Conformation
 from msmbuilder import xtc
@@ -68,6 +68,7 @@ class Trajectory(ConformationBaseClass):
     The dictionary key 'XYZList' contains a numpy array of XYZ coordinates, stored such that
     X[i,j,k] gives Frame i, Atom j, Coordinate k.
     """
+    required_keys = ["serial","name","altLoc","resName","chainid","resSeq","XYZList","occupancy","tempFactor","element"]    
     def __init__(self, S):
         """Create a Trajectory from a single conformation.
 
@@ -88,11 +89,61 @@ class Trajectory(ConformationBaseClass):
         load_from_hdf
         load_from_lhdf
         """
+        for key in Trajectory.required_keys:
+            if not S.has_key(key):
+                raise Exception("Cannot construct Trajectory while missing key %s"%key)
 
-        ConformationBaseClass.__init__(self, S)
-        self["XYZList"] = []
-        if "XYZList" in S:
-            self["XYZList"] = S["XYZList"].copy()
+        Serializer.__init__(self,S)
+
+        for key in self.keys(): #Copy values to avoid sharing memory        
+            self[key] = self[key].copy()
+            
+        self.update_index_list()
+
+    def update_index_list(self):
+        """Construct a list of which atoms belong to which residues.
+
+        NOTE: these indices are NOT the same as the Residueids--these indices take the value 0, 1, ..., (n-1)
+        where n is the number of residues.
+        """
+        self["IndexList"] = [[] for i in range(self.get_number_of_residues())]
+
+        zero_index_residue_id = self.get_enumerated_residue_id()
+        for i in range(self.get_number_of_atoms()):
+            self["IndexList"][zero_index_residue_id[i]].append(i)
+
+    def get_number_of_atoms(self):
+        """Return the number of atoms in this object."""
+        return len(self["name"])
+    
+    def get_number_of_residues(self):
+        """Return the number of residues in this object."""
+        return len(np.unique(self["resSeq"]))
+
+    def get_enumerated_atom_id(self):
+        """Returns an array of consecutive integers that enumerate over all atoms in the system.  STARTING WITH ZERO!"""
+        return np.arange(len(self["serial"]))
+
+    def get_enumerated_residue_id(self):
+        """Returns an array of NONUNIQUE consecutive integers that enumerate over all Residues in the system.  STARTING WITH ZERO!
+
+        Note: This will return something like [0,0,0,1,1,1,2,2,2]--the first 3 atoms belong to residue 0, the next 3 belong to 1, etc.
+        """
+        unique_pdb_id = np.unique(self["resSeq"])
+        D = dict([[x,i] for i,x in enumerate(unique_pdb_id)])
+        
+        X = np.zeros(len(self["resSeq"]),'int')
+        for i in xrange(self.get_number_of_atoms()):
+            X[i] = D[self["resSeq"][i]]
+        return X
+
+    def restrict_atom_indices(self,atom_indices):
+        for key,val in self.keys():
+            if key not in ["XYZList","IndexList"]:
+                self[key] = val[atom_indices]
+        
+        self['XYZList'] = self['XYZList'][:, atom_indices].copy()
+        self.update_index_list()
 
     def subsample(self, stride):
         """Keep only the frames at some interval
@@ -165,11 +216,6 @@ class Trajectory(ConformationBaseClass):
                 raise TypeError('The two trajectories don\'t have the same number of atoms')
             self['XYZList'] = np.vstack((self['XYZList'], other['XYZList']))
         return self
-
-    def restrict_atom_indices(self, AtomIndices):
-        ConformationBaseClass.restrict_atom_indices(self, AtomIndices)
-
-        self['XYZList'] = copy.copy(self['XYZList'][:, AtomIndices])
 
     def save_to_lhdf(self, Filename, precision=DEFAULT_PRECISION):
         """Save a Trajectory instance to a Lossy HDF File.
@@ -303,15 +349,40 @@ class Trajectory(ConformationBaseClass):
             self["XYZList"].append(Temp)
 
     @classmethod
-    def load_from_pdb(cls, Filename):
-        """Create a Trajectory from a PDB Filename
-
+    def load_from_pdb(cls,filename):       
+        """Create a Trajectory from a PDB filename
+        
         Parameters
         ----------
-        Filename: str
+        filename : str
             location to load from
         """
-        return(Trajectory(PDB.LoadPDB(Filename, AllFrames=True)))
+        parser = PDBParser(QUIET=True)
+        structure = parser.get_structure("test", filename)
+        model = structure[0]
+        pdb_dict = dict([(key,[]) for key in Trajectory.required_keys])
+        
+        for chain in model.child_list:
+            chain_id = chain.id
+            for res in chain.child_list:
+                res_id = int(res.id[1])
+                for a in res.child_list:
+                    pdb_dict["XYZList"].append(a.coord)
+                    pdb_dict["name"].append(a.name)
+                    pdb_dict["element"].append(a.element)
+                    pdb_dict["serial"].append(a.serial_number)
+                    pdb_dict["tempFactor"].append(a.bfactor)
+                    pdb_dict["occupancy"].append(a.occupancy)
+                    pdb_dict["chainid"].append(chain_id)
+                    pdb_dict["resName"].append(res.resname)
+                    pdb_dict["resSeq"].append(res_id)
+
+        for key,val in pdb_dict.iteritems():
+            if key not in ["IndexList"]:
+                pdb_dict[key] = np.array(val)
+            
+        pdb_dict["resName"] = pdb_dict["resName"].astype("S4")        
+        return(Trajectory(pdb_dict))
 
     @classmethod
     def load_from_xtc(cls, XTCFilenameList, PDBFilename=None, Conf=None, PreAllocate=True,
