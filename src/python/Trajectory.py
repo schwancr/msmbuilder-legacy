@@ -315,7 +315,7 @@ class Trajectory(ConformationBaseClass):
 
     @classmethod
     def load_from_xtc(cls, XTCFilenameList, PDBFilename=None, Conf=None, PreAllocate=True,
-                    JustInspect=False, discard_overlapping_frames=False):
+                    JustInspect=False, discard_overlapping_frames=False, atom_indices=None):
         """Create a Trajectory from a collection of XTC files
 
         Parameters
@@ -351,11 +351,15 @@ class Trajectory(ConformationBaseClass):
             raise Exception("ERROR: Need a conformation to construct a trajectory.")
 
         if not JustInspect:
+            n_atoms = A['XYZList'].shape[1]
+            
+            if atom_indices is not None and len(atom_indices) != n_atoms:
+                logger.critical('Number of atoms in PDB does not match number of atoms in atom_indices')
 
             A["XYZList"] = []
             num_redundant = 0
 
-            for i, c in enumerate(xtc.XTCReader(XTCFilenameList)):
+            for i, c in enumerate(xtc.XTCReader(XTCFilenameList, atomindices=atom_indices)):
                 # check to see if we have redundant frames as we load them up
                 if discard_overlapping_frames:
                     if i > 0:
@@ -383,7 +387,7 @@ class Trajectory(ConformationBaseClass):
         return(A)
 
     @classmethod
-    def load_from_dcd(cls, FilenameList, PDBFilename=None, Conf=None, PreAllocate=True, JustInspect=False):
+    def load_from_dcd(cls, FilenameList, PDBFilename=None, Conf=None, PreAllocate=True, JustInspect=False, atom_indices=None):
         """Create a Trajectory from a Filename."""
 
         if PDBFilename != None:
@@ -394,13 +398,16 @@ class Trajectory(ConformationBaseClass):
             raise Exception("ERROR: Need a conformation to construct a trajectory.")
 
         if not JustInspect:
+            if atom_indices is not None and A['XYZList'].shape[1] != len(atom_indices):
+                logger.critical('Number of atoms in PDB does not match number of atoms in atom_indices')
+                
             A["XYZList"] = []
-            for c in dcd.DCDReader(FilenameList):
+            for c in dcd.DCDReader(FilenameList, atomindices=atom_indices):
                 A["XYZList"].append(c.copy())
             A["XYZList"] = np.array(A["XYZList"])
         else:  # This is wasteful to read everything in just to get the length
             XYZ = []
-            for c in dcd.DCDReader(FilenameList):
+            for c in dcd.DCDReader(FilenameList, atomindices=atom_indices):
                 XYZ.append(c.copy())
             XYZ = np.array(XYZ)
             return(XYZ.shape)
