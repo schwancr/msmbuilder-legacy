@@ -674,25 +674,29 @@ class Trajectory(ConformationBaseClass):
             raise IOError("Incorrect file type--cannot get conformation %s" % TrajFilename)
 
     @classmethod
-    def load_trajectory_file(cls, Filename, JustInspect=False, Conf=None, Stride=1):
+    def load_trajectory_file(cls, Filename, JustInspect=False, Conf=None, Stride=1, atom_indices=None):
         """Loads a trajectory into memory, automatically deciding which methods to call based on filetype.  For XTC files, this method uses a pre-registered Conformation filename as a pdb."""
         extension = os.path.splitext(Filename)[1]
 
         if extension == '.h5':
-            return Trajectory.load_from_hdf(Filename, JustInspect=JustInspect, Stride=Stride)
+            return Trajectory.load_from_hdf(Filename, JustInspect=JustInspect,
+                Stride=Stride, AtomIndices=atom_indices)
 
         elif extension == '.xtc':
             if Conf == None:
                 raise Exception("Need to register a Conformation to use XTC Reader.")
-            return Trajectory.load_from_xtc(Filename, Conf=Conf, JustInspect=JustInspect)[::Stride]
+            return Trajectory.load_from_xtc(Filename, Conf=Conf, JustInspect=JustInspect,
+                atom_indices=atom_indices)[::Stride]
 
         elif extension == '.dcd':
             if Conf == None:
                 raise Exception("Need to register a Conformation to use DCD Reader.")
-            return Trajectory.load_from_dcd(Filename, Conf=Conf, JustInspect=JustInspect)[::Stride]
+            return Trajectory.load_from_dcd(Filename, Conf=Conf, JustInspect=JustInspect,
+                atom_indices=atom_indices)[::Stride]
 
         elif extension == '.lh5':
-            return Trajectory.load_from_lhdf(Filename, JustInspect=JustInspect, Stride=Stride)
+            return Trajectory.load_from_lhdf(Filename, JustInspect=JustInspect, Stride=Stride,
+                AtomIndices=atom_indices)
 
         elif extension == '.pdb':
             return Trajectory.load_from_pdb(Filename)[::Stride]

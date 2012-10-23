@@ -126,9 +126,13 @@ functionality.
         structure with and RMSD higher than the specified value (in nanometers,
         with respect to the input PDB file). Pass -1 to disable this feature''',
         default=-1, type=float)
-    parser.add_argument('index_atoms_to_retain', help='''List of the indices of atoms
-        to retain. The numbering here is with respect to their order in the xtc or
-        dcd files''', default='all')
+    parser.add_argument('index_file_of_atoms_to_retain', help='''Path to a flat text
+        file containing the indices of atoms to retain.
+        The numbering here is with respect to their order in the xtc or
+        dcd files. Note: This argument will select only a subset of the atoms
+        from your trajectory source files but will not touch the PDB file. Please
+        make sure the PDB file you supply also contains the correct number of atoms.''',
+        default='all')
     #parser.add_argument('parallel', help='''Run the conversion in parallel.
     #    multiprocessing launches multiple python interpreters to use all of your cores.
     #    dtm uses mpi, and requires python's "deap" module to be installed. To execute the
