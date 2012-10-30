@@ -2497,64 +2497,59 @@ if __name__ == "__main__":  main()
 
 from scipy import array,chararray, sign
 
-def load_pdb(filename, all_frames=False):
+def LoadPDB(Filename,AllFrames=False):
     """Loads a PDB and returns a dictionary containing its data.
 
     Inputs:
-    filename -- filename of PDB.
+    Filename -- filename of PDB.
 
     Keyword Inputs:
-    all_frames -- Set to True to load ALL frames.  Default: False
+    AllFrames -- Set to True to load ALL frames.  Default: False
     """
 
-    file_obj = file(filename,'r')
-    parsed_pdb = readPDB(file_obj)
+    F1=file(Filename,'r')
+    ParsedPDB=readPDB(F1)
 
     #Separate into distinct lists for each model.
-    pdb_lines=[[]]
-    for x in parsed_pdb[0]:
+    PDBLines=[[]]
+    for x in ParsedPDB[0]:
         if x.__class__ in [END, ENDMDL]:
-            if all_frames==False:
+            if AllFrames==False:
                 break
 #            else:
 #                PDBLines.append([])
-        if x.__class__ == ATOM:
-            pdb_lines[-1].append(x)
+        if x.__class__==ATOM:
+            PDBLines[-1].append(x)
         
-    X = PDBLines[0]
+    X=PDBLines[0]
     
-    XYZ = array([[x.x, x.y, x.z] for x in X]) / 10.0#Convert to nanometers
-    ChainID = array([x.chainID for x in X], 'str')
-    AtomNames = array([x.name for x in X], 'str')
-    ResidueNames = array([x.resName for x in X], 'str')
-    ResidueID = array([x.resSeq for x in X], 'int')
-    ResidueID = ResidueID - ResidueID[0] + 1
-    AtomID = np.arange(len(AtomNames)) + 1
+    XYZ=array([[x.x,x.y,x.z] for x in X])/10.0#Convert to nanometers
+    ChainID=array([x.chainID for x in X],'str')
+    AtomNames=array([x.name for x in X],'str')
+    ResidueNames=array([x.resName for x in X],'str')
+    ResidueID=array([x.resSeq for x in X],'int')
+    ResidueID=ResidueID-ResidueID[0]+1
+    AtomID=np.arange(len(AtomNames))+1
 
-    if all_frames==True:
+    if AllFrames==True:
         XYZList=[]
-        for model in pdb_lines:
+        for Model in PDBLines:
             XYZList.append([])
-            for x in model:
-                XYZList[-1].append([x.x, x.y, x.z])
+            for x in Model:
+                XYZList[-1].append([x.x,x.y,x.z])
 
-        if len(XYZList[-1]) == 0:#If PDB contains trailing END / ENDMDL, remove empty list
+        if len(XYZList[-1])==0:#If PDB contains trailing END / ENDMDL, remove empty list
             XYZList.pop()
             
-        XYZList = array(XYZList) / 10.0#Convert to nanometers.
-        XYZList = XYZList.reshape((-1, len(ChainID), 3))
-        dict_answer = {"XYZList" : XYZList, "ChainID" : ChainID,
-                       "AtomNames" : AtomNames, "ResidueID" : ResidueID,
-                       "AtomID" : AtomID, "ResidueNames" : ResidueNames}
+        XYZList=array(XYZList)/10.0#Convert to nanometers.
+        XYZList=XYZList.reshape((-1,len(ChainID),3))
+        DictAnswer={"XYZList":XYZList,"ChainID":ChainID,"AtomNames":AtomNames,"ResidueID":ResidueID,"AtomID":AtomID,"ResidueNames":ResidueNames}
     else:
-        dict_answer = {"XYZ" : XYZ, "ChainID" : ChainID, 
-                       "AtomNames" : AtomNames, "ResidueID" : ResidueID,
-                       "AtomID" : AtomID, "ResidueNames" : ResidueNames}
+        DictAnswer={"XYZ":XYZ,"ChainID":ChainID,"AtomNames":AtomNames,"ResidueID":ResidueID,"AtomID":AtomID,"ResidueNames":ResidueNames}
 
-    return dict_answer
+    return(DictAnswer)
 
-def write_pdb_conformation(filename, atom_nums, atoms, res_names, res_nums, 
-                           xyz, chain ):
+def WritePDBConformation(Filename,ATOMNUMS,ATOMS,RESNAMES,RESNUMS,XYZ,CHAIN):
     """Save Conformation to a PDB. """
     """
             Initialize by parsing line
@@ -2580,43 +2575,53 @@ def write_pdb_conformation(filename, atom_nums, atoms, res_names, res_nums,
             77-78     string element       Element symbol, right-justified.
             79-80     string charge        Charge on the atom.
             """
-    file_obj = open(filename, 'a')
-    for i in range(len(atom_nums)):
-        line = chararray(80)
-        line[:] = ' '
-        line[0:4] = array( list("ATOM") )
-        line = array(line, 'str')
-        line[6:11] = array( list( str(atom_nums[i] % 100000).rjust(5) ) )
+    F=open(Filename,'a')
+    for i in range(len(ATOMNUMS)):
+        line=chararray(80)
+        line[:]=' '
+        line[0:4]=array(list("ATOM"))
+        line=array(line,'str')
+        line[6:11]=array(list(str(ATOMNUMS[i]%100000).rjust(5)))
         #Molprobity is picky about atom name centering
-        if len( str(atoms[i]) ) == 3:
-            line[12:16] = array( list( str(atoms[i]).rjust(4) ) )
-        elif len( str(atoms[i]) ) == 2:
-            line[12:16] = array( list( " " + str(atoms[i]) + " " ) )
-        elif len( str(atoms[i]) ) == 1:
-            line[12:16] = array( list( " " + str(atoms[i]) + "  " ) )
+        if len(str(ATOMS[i]))==3:
+            line[12:16]=array(list(str(ATOMS[i]).rjust(4)))
+        elif len(str(ATOMS[i]))==2:
+            line[12:16]=array(list(" "+str(ATOMS[i])+" "))
+        elif len(str(ATOMS[i]))==1:
+            line[12:16]=array(list(" "+str(ATOMS[i])+"  "))
         else:
-            line[12:16] = array( list( str(atoms[i]).center(4) ) )
-        if len( str(res_names[i]) ) == 3:
-            line[17:20] = array( list( str(res_names[i]) ) )
+            line[12:16]=array(list(str(ATOMS[i]).center(4)))
+        if len(str(RESNAMES[i]))==3:
+            line[17:20]=array(list(str(RESNAMES[i])))
         else:
-            line[17:21] = array( list( str(res_names[i]).ljust(4) ) )
+            line[17:21]=array(list(str(RESNAMES[i]).ljust(4)))
 
-        line[21] = str(chain[i]).rjust(1)
-        line[22:26] = array( list( str(res_nums[i]).rjust(4) ) )
+        line[21]=str(CHAIN[i]).rjust(1)
+        line[22:26]=array(list(str(RESNUMS[i]).rjust(4)))
 
-        x = 10 * XYZ[i][0]
-        y = 10 * XYZ[i][1]
-        z = 10 * XYZ[i][2]
-        sx = sign(x)
-        sy = sign(y)
-        sz = sign(z)
+        x=10*XYZ[i][0]
+        y=10*XYZ[i][1]
+        z=10*XYZ[i][2]
+        sx=sign(x)
+        sy=sign(y)
+        sz=sign(z)
 
-        line[30:38] = array( list( ("%8.3f"%(x) ) ) )
-        line[38:46] = array( list( ("%8.3f"%(y) ) ) )
-        line[46:54] = array( list( ("%8.3f"%(z) ) ) )
+        line[30:38]=array(list(("%8.3f"%(x))))
+        line[38:46]=array(list(("%8.3f"%(y))))
+        line[46:54]=array(list(("%8.3f"%(z))))
 
+<<<<<<< HEAD:src/python/temp_pdb.py
 
+=======
+<<<<<<< HEAD:src/python/pdb.py
+>>>>>>> ae90627... Trajectory fixes to interface with the new pdb.py:src/python/pdb.py
         if atom_nums[i] != -1:
             file_obj.write(line.tostring() + "\n")
     file_obj.write("ENDMDL\n")
     file_obj.close()
+=======
+
+        if ATOMNUMS[i]!=-1:
+            F.write(line.tostring()+"\n")
+    F.write("ENDMDL\n")
+>>>>>>> parent of 06be0df... Editting PDB.py to make it kind of pep8. I am only changing the functions that msmbuilder actually interacts with.:src/python/PDB.py

@@ -24,7 +24,7 @@ import os
 import tables
 import numpy as np
 
-from msmbuilder import PDB
+from msmbuilder import pdb
 from msmbuilder import io
 from msmbuilder.Conformation import ConformationBaseClass, Conformation
 from msmbuilder import xtc
@@ -260,10 +260,10 @@ class Trajectory(ConformationBaseClass):
         """
 
         for i in range(len(self["XYZList"])):
-            PDB.WritePDBConformation(filename, self["AtomID"], 
-                                     self["AtomNames"], self["ResidueNames"],
-                                     self["ResidueID"], self["XYZList"][i],
-                                     self["ChainID"])
+            pdb.write_pdb_conformation(filename, self["AtomID"], 
+                                       self["AtomNames"], self["ResidueNames"],
+                                       self["ResidueID"], self["XYZList"][i],
+                                       self["ChainID"])
 
     def save_to_xyz(self, filename):
         """Dump the coordinates to XYZ format
@@ -346,8 +346,7 @@ class Trajectory(ConformationBaseClass):
         filename: str
             location to load from
         """
-        return Trajectory(PDB.LoadPDB(filename, AllFrames=True)) 
-            # Still need to pep8ify PDB.py
+        return Trajectory(pdb.load_pdb(filename, all_frames=True)) 
 
     @classmethod
     def load_from_xtc(cls, xtc_filename_list, pdb_filename=None, conf=None,
