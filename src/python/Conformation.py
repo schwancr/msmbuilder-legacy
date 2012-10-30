@@ -19,7 +19,7 @@
 """Contains classes for dealing with conformations.
 """
 import numpy as np
-from msmbuilder import PDB
+from msmbuilder import pdb
 from msmbuilder.utils import deprecated
 
 class ConformationBaseClass(dict):
@@ -113,12 +113,12 @@ class Conformation(ConformationBaseClass):
         
     def save_to_pdb(self, filename):
         """Write conformation as a PDB file."""
-        PDB.WritePDBConformation(filename, self["AtomID"], self["AtomNames"],
-                                 self["ResidueNames"], self["ResidueID"],
-                                 self["XYZ"], self["ChainID"])
+        pdb.write_pdb_conformation(filename, self["AtomID"], self["AtomNames"],
+                                   self["ResidueNames"], self["ResidueID"],
+                                   self["XYZ"], self["ChainID"])
         
     @classmethod
     def load_from_pdb(cls, filename):       
         """Create a conformation from a PDB File."""
-        return(cls(PDB.LoadPDB(filename)))
+        return cls(pdb.load_pdb(filename))
 
