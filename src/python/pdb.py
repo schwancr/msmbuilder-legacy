@@ -2521,7 +2521,7 @@ def load_pdb(filename, all_frames=False):
         if x.__class__ == ATOM:
             pdb_lines[-1].append(x)
         
-    X = PDBLines[0]
+    X = pdb_lines[0]
     
     XYZ = array([[x.x, x.y, x.z] for x in X]) / 10.0#Convert to nanometers
     ChainID = array([x.chainID for x in X], 'str')
