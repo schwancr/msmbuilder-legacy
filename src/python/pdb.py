@@ -2610,18 +2610,7 @@ def WritePDBConformation(Filename,ATOMNUMS,ATOMS,RESNAMES,RESNUMS,XYZ,CHAIN):
         line[38:46]=array(list(("%8.3f"%(y))))
         line[46:54]=array(list(("%8.3f"%(z))))
 
-<<<<<<< HEAD:src/python/temp_pdb.py
-
-=======
-<<<<<<< HEAD:src/python/pdb.py
->>>>>>> ae90627... Trajectory fixes to interface with the new pdb.py:src/python/pdb.py
         if atom_nums[i] != -1:
             file_obj.write(line.tostring() + "\n")
     file_obj.write("ENDMDL\n")
     file_obj.close()
-=======
-
-        if ATOMNUMS[i]!=-1:
-            F.write(line.tostring()+"\n")
-    F.write("ENDMDL\n")
->>>>>>> parent of 06be0df... Editting PDB.py to make it kind of pep8. I am only changing the functions that msmbuilder actually interacts with.:src/python/PDB.py
