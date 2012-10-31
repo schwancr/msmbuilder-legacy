@@ -25,16 +25,16 @@ from msmbuilder.arglib import ArgumentParser, die_if_path_exists
 import logging
 logger = logging.getLogger('msmbuilder.scripts.ConvertDataToHDF')
 
-def run(projectfn, PDBfn, InputDir, source, min_length, stride, rmsd_cutoff):
+def run(project_fn, pdb_fn, input_dir, source, min_length, stride, rmsd_cutoff):
     
     # check if we are doing an update or a fresh run
-    if os.path.exists(projectfn):
+    if os.path.exists(project_fn):
         logger.info("Found project info file encoding previous work, running in update mode...")
         update = True
     else:
         update = False
     
-    logger.info("Looking for %s style data in %s", source, InputDir)
+    logger.info("Looking for %s style data in %s", source, input_dir)
     if update:
         raise NotImplementedError("Ack! Update mode is not yet ready yet.")
     
@@ -44,9 +44,11 @@ def run(projectfn, PDBfn, InputDir, source, min_length, stride, rmsd_cutoff):
     # hierarchy of FaH (RUN/CLONE/GEN/frame.xtc)
     if source.startswith('file'):
         itype = '.dcd' if 'dcd' in source else '.xtc'
-        pb = ProjectBuilder(InputDir, input_traj_ext=itype, conf_filename=PDBfn, stride=stride)
+        pb = ProjectBuilder(input_dir, input_traj_ext=itype, 
+                            conf_filename=pdb_fn, stride=stride)
     elif source == 'fah':
-        pb = FahProjectBuilder(InputDir, input_traj_ext='.xtc', conf_filename=PDBfn, stride=stride)
+        pb = FahProjectBuilder(input_dir, input_traj_ext='.xtc', 
+                               conf_filename=pdb_fn, stride=stride)
     else:
         raise ValueError("Invalid argument for source: %s" % source)
 
@@ -56,7 +58,9 @@ def run(projectfn, PDBfn, InputDir, source, min_length, stride, rmsd_cutoff):
     if rmsd_cutoff is not None:
         # TODO: this is going to use ALL of the atom_indices, including hydrogen. This is
         # probably not the desired functionality
-        validator = validators.RMSDExplosionValidator(PDBfn, max_rmsd=rmsd_cutoff, atom_indices=None)
+        validator = validators.RMSDExplosionValidator(pdb_fn, 
+                                                      max_rmsd=rmsd_cutoff, 
+                                                      atom_indices=None)
         pb.add_validator(validator)
     
     # Only accept trajectories with more snapshots than min_length.
@@ -67,10 +71,10 @@ def run(projectfn, PDBfn, InputDir, source, min_length, stride, rmsd_cutoff):
     # everyone wants to be centered
     pb.add_validator(validators.TrajCenterer())
     
-    pb.get_project().save(projectfn)
-    assert os.path.exists(projectfn), '%s does not exist' % projectfn
+    pb.get_project().save(project_fn)
+    assert os.path.exists(project_fn), '%s does not exist' % project_fn
     logger.info("Finished data conversion successfully.")
-    logger.info("Generated: %s, Trajectories/", projectfn)
+    logger.info("Generated: %s, Trajectories/", project_fn)
     
     return
 
