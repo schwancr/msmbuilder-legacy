@@ -104,9 +104,9 @@ def _get_indices_chi(conformation):
     Returns a num_residues x 4 array
     '''
     
-    NResi = conformation.GetNumberOfResidues()
-    AID = conformation.GetEnumeratedAtomID()
-    RID = conformation.GetEnumeratedResidueID()
+    NResi = conformation.num_residues
+    AID = conformation.get_enumerated_atom_id()
+    RID = conformation.get_enumerated_residue_id()
     AName = conformation["AtomNames"]
     Indices = []
     for i in range(NResi):
@@ -135,10 +135,9 @@ def _get_indices_phi(conformation):
     
     Returns a num_residues x 4 array
     '''
-    
-    NResi = conformation.GetNumberOfResidues()
-    AID = conformation.GetEnumeratedAtomID()
-    RID = conformation.GetEnumeratedResidueID()
+    NResi = conformation.num_residues
+    AID = conformation.get_enumerated_atom_id()
+    RID = conformation.get_enumerated_residue_id()
     AName = conformation["AtomNames"]
     Indices = []
     for i in range(NResi):
@@ -162,9 +161,9 @@ def _get_indices_psi(conformation):
     Returns a num_residues x 4 array
     '''
     
-    NResi = conformation.GetNumberOfResidues()
-    AID = conformation.GetEnumeratedAtomID()
-    RID = conformation.GetEnumeratedResidueID()
+    NResi = conformation.num_residues
+    AID = conformation.get_enumerated_atom_id()
+    RID = conformation.get_enumerated_residue_id()
     AName = conformation["AtomNames"]
     Indices = []
     for i in range(NResi):
@@ -188,9 +187,9 @@ def _get_indices_omega(conformation):
     Returns a num_residues x 4 array
     '''
 
-    NResi = conformation.GetNumberOfResidues()
-    AID = conformation.GetEnumeratedAtomID()
-    RID = conformation.GetEnumeratedResidueID()
+    NResi = conformation.num_residues
+    AID = conformation.get_enumerated_atom_id()
+    RID = conformation.get_enumerated_residue_id()
     AName = conformation["AtomNames"]
     Indices = []
     for i in range(NResi):

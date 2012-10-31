@@ -2604,9 +2604,9 @@ def write_pdb_conformation(filename, atom_nums, atoms, res_names, res_nums,
         line[21] = str(chain[i]).rjust(1)
         line[22:26] = array( list( str(res_nums[i]).rjust(4) ) )
 
-        x = 10 * XYZ[i][0]
-        y = 10 * XYZ[i][1]
-        z = 10 * XYZ[i][2]
+        x = 10 * xyz[i][0]
+        y = 10 * xyz[i][1]
+        z = 10 * xyz[i][2]
         sx = sign(x)
         sy = sign(y)
         sz = sign(z)
