@@ -75,8 +75,8 @@ class ProjectBuilder(object):
             On failure
         """
 
-        for valilator in self._validators:
-            valilator(traj)
+        for validator in self._validators:
+            validator(traj)
 
     def add_validator(self, validator):
         """

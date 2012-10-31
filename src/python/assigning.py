@@ -74,8 +74,8 @@ def assign_in_memory(metric, generators, project):
     # then inject a blank array into RMSD
     # TODO clean this up 
     if isinstance(metric, metrics.RMSD):
-        atom_indices = metric.atomindices
-        metric.atomindices = None # probably bad...
+        atom_indices = metric.atom_indices
+        metric.atom_indices = None # probably bad...
         logger.info('RMSD metric - loading only the atom indices required')
     else:
         atom_indices = None
@@ -137,8 +137,8 @@ def assign_with_checkpoint(metric, project, generators, assignments_path,
     # then inject a blank array into RMSD
     # TODO clean this up 
     if isinstance(metric, metrics.RMSD):
-        atom_indices = metric.atomindices
-        metric.atomindices = None # probably bad...
+        atom_indices = metric.atom_indices
+        metric.atom_indices = None # probably bad...
         logger.info('RMSD metric - loading only the atom indices required')
     else:
         atom_indices = None

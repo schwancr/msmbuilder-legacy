@@ -28,7 +28,7 @@ class TestRMSD():
         for metric in rmsds:
             ptraj = metric.prepare_trajectory(self.traj)
             assert isinstance(ptraj, metrics.RMSD.TheoData)
-            ptraj.CheckCentered()
+            ptraj.check_centered()
     
     
     def test_one_to_all(self):

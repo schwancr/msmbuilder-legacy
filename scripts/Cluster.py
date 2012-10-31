@@ -185,10 +185,10 @@ could stride a little at the begining, but its not recommended.""")
     # if we have a metric that explicitly operates on a subset of indices,
     # then we provide the option to only load those indices into memory
     # WARNING: I also do something a bit dirty, and inject `None` for the
-    # RMSD.atomindices to get the metric to not splice
+    # RMSD.atom_indices to get the metric to not splice
     if isinstance(metric, metrics.RMSD):
-        atom_indices = metric.atomindices
-        metric.atomindices = None # probably bad...
+        atom_indices = metric.atom_indices
+        metric.atom_indices = None # probably bad...
         logger.info('RMSD metric - loading only the atom indices required')
     else:
         atom_indices = None
