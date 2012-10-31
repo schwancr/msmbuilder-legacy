@@ -29,6 +29,7 @@ from msmbuilder import io
 from msmbuilder.Conformation import ConformationBaseClass, Conformation
 from msmbuilder import xtc
 from msmbuilder import dcd
+from msmbuilder.utils import deprecated
 
 import logging
 logger = logging.getLogger(__name__)
@@ -44,8 +45,8 @@ def _convert_to_lossy_integers(data, precision=DEFAULT_PRECISION):
     conversion functions have been optimized for memory use.  Further memory 
     reduction would require an in-place astype() operation, which one could 
     create using ctypes."""
-    if (np.max(data)*float(precision) < MAXINT16 and 
-        np.min(data)*float(precision) > -MAXINT16):
+    if (np.max(data) * float(precision) < MAXINT16 and 
+        np.min(data) * float(precision) > -MAXINT16):
 
         data *= float(precision) 
         rounded_data = data.astype("int16")
@@ -214,7 +215,7 @@ class Trajectory(ConformationBaseClass):
         # This doesn't get saved it's just regenerated every time the 
         # trajectory is loaded
         index_list = self.pop('IndexList') 
-        
+
         xyzlist = self.pop('XYZList')
         rounded = _convert_to_lossy_integers(xyzlist, precision)
         self['XYZList'] = rounded
@@ -224,7 +225,7 @@ class Trajectory(ConformationBaseClass):
         # Return the instance to what it was before the save:
         self['XYZList'] = xyzlist
         self['IndexList'] = index_list 
-        
+
     def save_to_xtc(self, filename, precision=DEFAULT_PRECISION):
         """Dump the coordinates to XTC
 
@@ -323,7 +324,7 @@ class Trajectory(ConformationBaseClass):
             self.save_to_xyz(filename)
         else:
             raise IOError("File: %s. I don't understand the extension '%s'" %  
-                            (filename, extension) )
+                            (filename, extension))
 
     def append_pdb(self, filename):
         """Add a pdb file to self.
@@ -411,7 +412,7 @@ class Trajectory(ConformationBaseClass):
             if num_redundant != 0:
                 logger.warning("Found and discarded %d redundant snapshots in" 
                                " loaded traj", num_redundant)
-        else: # just_inspect is True, so return the shape of the data
+        else:  # just_inspect is True, so return the shape of the data
             i = 0
             for c in xtc.XTCReader(xtc_filename_list):
                 if i == 0:
@@ -470,7 +471,7 @@ class Trajectory(ConformationBaseClass):
                             "trajectory.")
         if not just_inspect:
             temp_traj["XYZList"] = []
-            temp_traj["Velocities"] = [] # Do we care about these? (and Forces)
+            temp_traj["Velocities"] = []  # Do we care about these? (and Forces)
             temp_traj["Forces"] = []
             for c in xtc.TRRReader(trr_filename_list):
                 temp_traj["XYZList"].append(np.array(c.coords).copy())
@@ -496,7 +497,7 @@ class Trajectory(ConformationBaseClass):
         # steps, so it is not complete until the very end
         temp_traj = Trajectory.load_from_pdb(filenames[0])
         for f in filenames[1:]:
-            temp_traj.append_pdb(f) # AHA! This is what uses that function.
+            temp_traj.append_pdb(f) 
         temp_traj["XYZList"] = np.array(temp_traj["XYZList"])
         return temp_traj
 
@@ -530,15 +531,13 @@ class Trajectory(ConformationBaseClass):
         if atom_indices != None:
             restrict_atoms = True
         if stride != None:
-            while (chunk_size % stride) != 0:# Need to do this in order to make 
-                                             # sure we stride correctly.
-                                             # since we read in chunks, and 
-                                             # then we need the strides
-                                             # to line up
+        # Need to change chunk_size in order to make sure we stride correctly.
+        # since we read in chunks, and then we need the strides to line up
+            while (chunk_size % stride) != 0:
                 chunk_size -= 1
 
         temp_traj = {}
-        file_obj = tables.File(traj_filename,'r')
+        file_obj = tables.File(traj_filename, 'r')
         # load all the data other than XYZList
 
         if restrict_atoms:
@@ -690,8 +689,8 @@ class Trajectory(ConformationBaseClass):
         - trajectory: Trajectory instance read from disk
         """
         if not just_inspect:
-            temp_traj = cls.load_from_hdf( traj_filename, stride=stride, 
-                                           atom_indices=atom_indices)
+            temp_traj = cls.load_from_hdf(traj_filename, stride=stride, 
+                                          atom_indices=atom_indices)
             temp_traj['XYZList'] = _convert_from_lossy_integers(
                                            temp_traj['XYZList'], precision)
             return temp_traj
@@ -865,9 +864,9 @@ class Trajectory(ConformationBaseClass):
                 break
 
             if (trajectory["XYZList"][i, :, :] == 
-                trajectory["XYZList"][i+1, :, :]).all():
+                trajectory["XYZList"][(i + 1), :, :]).all():
 
-                trajectory = trajectory[:i] + trajectory[i+1:]
+                trajectory = trajectory[:i] + trajectory[(i + 1):]
                 n += 1
             else:
                 i += 1
@@ -877,3 +876,8 @@ class Trajectory(ConformationBaseClass):
                            "in trajectory", n)
 
         return trajectory
+
+
+    @deprecated(load_trajectory_file, '2.7')
+    def LoadTrajectoryFile(cls, trajectory_file):
+        return cls.load_trajectory_file( trajectory_file )

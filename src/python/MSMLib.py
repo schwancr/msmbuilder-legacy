@@ -42,6 +42,7 @@ from msmbuilder import msm_analysis
 import logging
 logger = logging.getLogger(__name__)
 
+
 def estimate_rate_matrix(count_matrix, assignments):
     """MLE Rate Matrix given transition counts and *dwell times*
 
@@ -76,26 +77,34 @@ def estimate_rate_matrix(count_matrix, assignments):
 
     # Find the estimated dwell times (need to deal w negative ones)
     neg_ind = np.where(assignments == -1)
-    n = np.max(assignments.flatten()) + 1
+    n = np.max(assignments.flatten()) + 1  # Bad things will happen if 
+                                           # assignments are not contiguous
     assignments[neg_ind] = n
-    R = np.bincount(assignments.flatten())
-    R = R[:n]
-    assert count_matrix.shape[0] == R.shape[0]
+    num_assigns = np.bincount(assignments.flatten())
+    num_assigns = num_assigns[:n]
+    assert count_matrix.shape[0] == num_assigns.shape[0]
 
     # Most Likely Estimator ( Kij(hat) = Nij / Ri )
+    # Where K is the rate matrix, N is the Transition count matrix and Ri is
+    # the number of assignments to state i
+    
     if scipy.sparse.isspmatrix(count_matrix):
-        C = scipy.sparse.csr_matrix(count_matrix).asfptype()
-        D = scipy.sparse.dia_matrix((1.0 / R, 0), C.shape).tocsr()
-        K = D*C # if all is sparse is matrix multiply, formerly: D.dot( C )
+        count_matrix_copy = scipy.sparse.csr_matrix(count_matrix).asfptype()
+        D = scipy.sparse.dia_matrix((1.0 / num_assigns, 0), 
+                                    count_matrix_copy.shape).tocsr()
+        K = D * count_matrix_copy  
+        # if all is sparse then the above is matrix multiplication
     else:
         # deprecated due to laziness --TJL
         raise ValueError("ERROR! Pass sparse matrix to me")
 
     # Now get the diagonals right. They should be negative row sums
-    row_sums = np.asarray(C.sum(axis=1)).flatten()
-    current  = K.diagonal()
-    S = scipy.sparse.dia_matrix(((row_sums + (2.0*current)), 0), C.shape).tocsr()
-    K = K - S
+    row_sums = np.asarray(count_matrix_copy.sum(axis=1)).flatten()
+    current_diag = K.diagonal()
+    diag_correction = scipy.sparse.dia_matrix(
+                                ((row_sums + (2.0 * current_diag)), 0), 
+                                count_matrix_copy.shape).tocsr()
+    K = K - diag_correction
     if not K.shape == count_matrix.shape:
         raise RuntimeError('Bad news bears')
     #assert K.sum(0).all() == np.zeros(K.shape[0]).all(), K.sum(0).all()
@@ -114,26 +123,31 @@ def estimate_transition_matrix(count_matrix):
 
     Returns
     -------
-    tProb : array or sparse matrix
+    trans_prob : array or sparse matrix
          Most likely transition matrix given `tCount`
     """
-    #1.  Make sure you don't modify tCounts.
+    #1.  Make sure you don't modify count_matrix.
     #2.  Make sure you handle both floats and ints
     if scipy.sparse.isspmatrix(count_matrix):
-        C = scipy.sparse.csr_matrix(count_matrix).asfptype()
-        weights = np.asarray(C.sum(axis=1)).flatten()
+        count_matrix_copy = scipy.sparse.csr_matrix(count_matrix).asfptype()
+        weights = np.asarray(count_matrix_copy.sum(axis=1)).flatten()
         inv_weights = np.zeros(len(weights))
         inv_weights[weights != 0] = 1.0 / weights[weights != 0]
-        D = scipy.sparse.dia_matrix((inv_weights,0),C.shape).tocsr()
-        tProb = D.dot(C)
+        row_norm_diag = scipy.sparse.dia_matrix((inv_weights, 0),
+                                                count_matrix_copy.shape).tocsr()
+        #trans_prob = row_norm_diag.dot(C) 
+        trans_prob = row_norm_diag * count_matrix_copy  
+        # CRS thinks this is the way to do it, since this is the way the
+        # estimate_rate_matrix does matrix multiplication
     else:
-        tProb = np.asarray(count_matrix.astype(float))  # astype creates a copy
-        weights = tProb.sum(axis=1)
+        trans_prob = np.asarray(count_matrix.astype(float))  
+        # astype creates a copy
+        weights = trans_prob.sum(axis=1)
         inv_weights = np.zeros(len(weights))
         inv_weights[weights != 0] = 1.0 / weights[weights != 0]
-        tProb = tProb * inv_weights.reshape((weights.shape[0],1))
+        trans_prob = trans_prob * inv_weights.reshape((weights.shape[0], 1))
 
-    return tProb
+    return trans_prob
 
 
 def build_msm(counts, symmetrize='MLE', ergodic_trimming=True):
@@ -176,7 +190,7 @@ def build_msm(counts, symmetrize='MLE', ergodic_trimming=True):
     if symmetrize == 'mle':
         rev_counts = mle_reversible_count_matrix(counts, prior=0.0)
     elif symmetrize == 'transpose':
-        rev_counts = 0.5*(counts + counts.transpose())
+        rev_counts = 0.5 * (counts + counts.transpose())
     elif symmetrize == 'none':
         rev_counts = counts
     else:
@@ -192,7 +206,7 @@ def build_msm(counts, symmetrize='MLE', ergodic_trimming=True):
     else:
         raise symmetrization_error
 
-    populations /= populations.sum() # ensure normalization
+    populations /= populations.sum()  # ensure normalization
 
     return rev_counts, t_matrix, populations, mapping
 
@@ -234,14 +248,17 @@ def get_count_matrix_from_assignments(assignments, n_states=None, lag_time=1, sl
 
     C = scipy.sparse.lil_matrix((int(n_states), int(n_states)), dtype='float32')  # Lutz: why are we using float for count matrices?
 
-    for A in assignments:
-        FirstEntry = np.where(A!=-1)[0]
+    for traj_assignments in assignments:
+        first_entry = np.where(traj_assignments != -1)[0]
         # New Code by KAB to skip pre-padded negative ones.
         # This should solve issues with Tarjan trimming results.
-        if len(FirstEntry) >= 1:
-            FirstEntry = FirstEntry[0]
-            A = A[FirstEntry:]
-            C = C + get_counts_from_traj(A, n_states, lag_time=lag_time, sliding_window=sliding_window)#.tolil()
+        if len(first_entry) >= 1:
+            first_entry = first_entry[0]
+            traj_assignments = traj_assignments[first_entry:]
+            # CRS: Does this overwrite the data in assignments?
+            C = C + get_counts_from_traj(traj_assignments, n_states, 
+                                         lag_time=lag_time, 
+                                         sliding_window=sliding_window)
 
     return C
 
@@ -655,7 +672,8 @@ def trim_states(states_to_trim, counts, assignments=None):
 
     if assignments is not None:
         trimmed_assignments = assignments.copy()
-        apply_mapping_to_assignments(trimmed_assignments, Mapping) # nefarious in-place
+        apply_mapping_to_assignments(trimmed_assignments, Mapping)  
+        # nefarious in-place
         return trimmed_counts, trimmed_assignments
     else:
         return trimmed_counts
@@ -732,31 +750,47 @@ def mle_reversible_count_matrix(count_matrix, prior=0.0, initial_guess=None):
     """
     C = count_matrix
 
-    def negativeLogLikelihoodFromCountEstimatesSparse(Xupdata, row, col, N, C):
+    def neg_log_likelihood_from_count_sparse(X_up_data, row, col, N, C):
         """Calculates the negative log likelihood that a symmetric count matrix X gave
     rise to an observed transition count matrix C, as well as the gradient
     d -log L / d X_ij."""
 
-        assert np.alltrue(Xupdata > 0)
+        assert np.alltrue(X_up_data > 0)
 
-        Xup = scipy.sparse.csr_matrix((Xupdata, (row, col)), shape=(N, N))                    # Xup is the upper triagonal (inluding the main diagonal) of the symmetric count matrix
-        X = Xup + Xup.T - scipy.sparse.spdiags(Xup.diagonal(), 0, Xup.shape[0], Xup.shape[1])  # X is the complete symmetric count matrix
-        Xs = np.array(X.sum(axis=1)).ravel()                                                # Xs is the array of row sums of X: Xs_i = sum_j X_ij
-        XsInv = scipy.sparse.spdiags(1.0 / Xs, 0, len(Xs), len(Xs))
-        P = (XsInv * X).tocsr()                                                             # P is now the matrix P_ij = X_ij / sum_j X_ij
-        logP = scipy.sparse.csr_matrix((np.log(P.data), P.indices, P.indptr))
-        logL = np.sum(C.multiply(logP).data)                                                # logL is the log of the likelihood: sum_ij C_ij log(X_ij / Xs_i)
+        X_up = scipy.sparse.csr_matrix((X_up_data, (row, col)), shape=(N, N))
+        # Xup is the upper triagonal (inluding the main diagonal) of the symmetric count matrix
+        X = X_up + X_up.T - scipy.sparse.spdiags(X_up.diagonal(), 0, 
+                                                 X_up.shape[0], X_up.shape[1])  
+        # X is the complete symmetric count matrix
+        row_sums_X = np.array(X.sum(axis=1)).ravel()
+        # Xs is the array of row sums of X: Xs_i = sum_j X_ij
+        row_sums_X_inv = scipy.sparse.spdiags(1.0 / row_sums_X, 0, 
+                                              len(row_sums_X), len(row_sums_X))
+        P = (row_sums_X_inv * X).tocsr()
+        # P is now the matrix P_ij = X_ij / sum_j X_ij
 
-        Cs = np.array(C.sum(axis=1)).ravel()                                                # Cs is the array of row sums of C: Cs_i = sum_j C_ij
-        srow, scol = X.nonzero()                                                            # remember the postitions of the non-zero elements of X
-        Udata = np.array((C[srow, scol] / X[srow, scol]) - (Cs[srow] / Xs[srow])).ravel()       # calculate the derivative: d(log L)/dX_ij = C_ij/X_ij - Cs_i/Xs_i
-        U = scipy.sparse.csr_matrix((Udata, (srow, scol)), shape=(N, N))                        # U is the matrix U_ij = d(log L) / dX_ij
+        log_P = scipy.sparse.csr_matrix((np.log(P.data), P.indices, P.indptr))
+        log_likelihood = np.sum(C.multiply(log_P).data) 
+        # logL is the log of the likelihood: sum_ij C_ij log(X_ij / Xs_i)
+
+        row_sums_C = np.array(C.sum(axis=1)).ravel() 
+        # Cs is the array of row sums of C: Cs_i = sum_j C_ij
+        srow, scol = X.nonzero() 
+        # remember the postitions of the non-zero elements of X
+
+        U_data = np.array((C[srow, scol] / X[srow, scol]) - 
+                          (row_sums_C[srow] / row_sums_X[srow])).ravel()
+        # calculate the derivative: d(log L)/dX_ij = C_ij/X_ij - Cs_i/Xs_i
+
+        U = scipy.sparse.csr_matrix((U_data, (srow, scol)), shape=(N, N))  
+        # U is the matrix U_ij = d(log L) / dX_ij
 
         # so far, we have assumed that all the partial derivatives wrt. X_ij are independent
         # however, the degrees of freedom are only X_ij for i <= j
         # for i != j, the total change in log L is d(log L)/dX_ij + d(log L)/dX_ji
 
-        gradient = (U + U.T - scipy.sparse.spdiags(U.diagonal(), 0, U.shape[0], U.shape[1])).tocsr()
+        gradient = (U + U.T - scipy.sparse.spdiags(U.diagonal(), 0, U.shape[0],
+                                                   U.shape[1])).tocsr()
 
         # now we have to convert the non-zero elements of the upper triangle into the
         # same 1-d array structure that was used for Xupdata
@@ -764,12 +798,14 @@ def mle_reversible_count_matrix(count_matrix, prior=0.0, initial_guess=None):
         gradient = np.array(gradient[row, col]).reshape(-1)
 
         #print  "max g:", np.max(gradient), "min g:", np.min(gradient), "|g|^2", (gradient*gradient).sum(), "g * X", (gradient*Xupdata).sum()
-        return -logL, -gradient
+        return -log_likelihood, -gradient
 
     # current implementation only for sparse matrices
     # if given a dense matrix, sparsify it, and turn the result back to a dense array
     if not scipy.sparse.isspmatrix(C):
-        return mle_reversible_count_matrix(scipy.sparse.csr_matrix(C), prior=prior, initial_guess=initial_guess).toarray()
+        return mle_reversible_count_matrix(scipy.sparse.csr_matrix(C), 
+                                           prior=prior, 
+                                           initial_guess=initial_guess).toarray()
 
     N = C.shape[0]
     if not C.shape[1] == N:
@@ -779,10 +815,10 @@ def mle_reversible_count_matrix(count_matrix, prior=0.0, initial_guess=None):
     C.eliminate_zeros()
     # add prior if necessary
     if (prior is not None) and (prior != 0):
-        PriorMatrix = (C+C.transpose()).tocsr()
-        PriorMatrix.data *= 0.
-        PriorMatrix.data += prior
-        C = C + PriorMatrix
+        prior_matrix = (C + C.transpose()).tocsr()
+        prior_matrix.data *= 0.
+        prior_matrix.data += prior
+        C = C + prior_matrix
         logger.warning("Added prior value of %f to count matrix", prior)
 
     # initial guess for symmetric count matrix
@@ -790,19 +826,19 @@ def mle_reversible_count_matrix(count_matrix, prior=0.0, initial_guess=None):
         X0 = 0.5 * (C + C.T)
     else:
         X0 = scipy.sparse.csr_matrix(0.5 * (initial_guess + initial_guess.T))  # this guarantees that the initial guess is indeed symmetric (and sparse)
-    initialLogLikelihood = log_likelihood(C, estimate_transition_matrix(X0))
+    init_log_likelihood = log_likelihood(C, estimate_transition_matrix(X0))
 
     # due to symmetry, we degrees of freedom for minimization are only the elments in the upper triangle of the matrix X (incl. main diagonal)
-    X0up = scipy.sparse.triu(X0).tocoo()
-    row = X0up.row
-    col = X0up.col
+    X0_up = scipy.sparse.triu(X0).tocoo()  # Upper diagonal of the initial data
+    row = X0_up.row
+    col = X0_up.col
 
     # the variables used during minimization are those X_ij (i <= j) for which either C_ij or C_ji is greater than zero
     # those X_ij can be arbitrariliy small, but they must be positive
     # the function minimizer requires an inclusive bound, so we use some very small number instead of zero
     # (without loss of generality, b/c we can always multiply all X_ij by some large number without changing the likelihood)
     lower_bound = 1.E-10
-    bounds = [[lower_bound, np.inf]] * len(X0up.data)
+    bounds = [[lower_bound, np.inf]] * len(X0_up.data)
 
     # Here comes the main loop
     # In principle, we would have to run the function minimizer only once. But in practice, minimization may fail
@@ -813,45 +849,62 @@ def mle_reversible_count_matrix(count_matrix, prior=0.0, initial_guess=None):
     rescale_every = 500
     rescale_target = 1.
 
-    Xupdata = X0up.data
-    maximizationrun = 1
-    totalnumberoffunctionevaluations = 0
-    negative_logL, negative_gradient = negativeLogLikelihoodFromCountEstimatesSparse(Xupdata, row, col, N, C)
-    logger.info("Log-Likelihood of intial guess for reversible transition probability matrix: %s", -negative_logL)
-    while maximizationrun <= 1000:
+    X_up_data = X0_up.data
+    maximization_run = 1
+    total_f_evals = 0
+    neg_log_likelihood, neg_gradient = neg_log_likelihood_from_count_sparse(
+                                            X_up_data, row, col, N, C)
+    logger.info("Log-Likelihood of intial guess for reversible transition "
+                "probability matrix: %s", -neg_log_likelihood)
+    while maximization_run <= 1000:
         # rescale the X_ij so that the magnitude of the gradient is 1
-        gtg = (negative_gradient*negative_gradient).sum()
-        scalefactor = np.sqrt(gtg / rescale_target)
-        Xupdata[:] *= scalefactor
+        gradient_mag_sqr = (neg_gradient * neg_gradient).sum()
+        scale_factor = np.sqrt(gradient_mag_sqr / rescale_target)
+        X_up_data[:] *= scale_factor
 
-        # now run the minimizer
-        Xupdata, nfeval, rc = scipy.optimize.fmin_tnc(negativeLogLikelihoodFromCountEstimatesSparse,
-                                        Xupdata, args=(row, col, N, C), bounds=bounds,
-                                        approx_grad=False, maxfun=rescale_every, disp=0,
+        # now run the minimizer, X_up_data contains all of the transition 
+        # counts in the current iteration. num_f_evals is the number of
+        # function evaluations used in this minimization, and rc is a flag that
+        # tells us whether we've converged or not
+        X_up_data, num_f_evals, rc = scipy.optimize.fmin_tnc(
+                                        neg_log_likelihood_from_count_sparse,
+                                        X_up_data, args=(row, col, N, C), 
+                                        bounds=bounds, approx_grad=False, 
+                                        maxfun=rescale_every, disp=0,
                                         xtol=1E-20)
 
-        totalnumberoffunctionevaluations += nfeval
-        negative_logL, negative_gradient = negativeLogLikelihoodFromCountEstimatesSparse(Xupdata, row, col, N, C)
-        logger.info("Log-Likelihood after %s function evaluations; %s ", totalnumberoffunctionevaluations, -negative_logL)
+        total_f_evals += num_f_evals
+
+        neg_log_likelihood, neg_gradient = neg_log_likelihood_from_count_sparse(
+                                            X_up_data, row, col, N, C)
+
+        logger.info("Log-Likelihood after %s function evaluations; %s ", 
+                    total_f_evals, -neg_log_likelihood)
+
         if rc in (0, 1, 2):
             break    # Converged
         elif rc in (3, 4):
             pass     # Not converged, keep going
         else:
-            raise RuntimeError("Likelihood maximization caused internal error (code %s): %s" % (rc, scipy.optimize.tnc.RCSTRINGS[rc]))
-        maximizationrun += 1
+            raise RuntimeError("Likelihood maximization caused internal error "
+                               "(code %s): %s" % (rc, scipy.optimize.tnc.RCSTRINGS[rc]))
+        maximization_run += 1
     else:
         logger.error("maximum could not be obtained.")
-    logger.info("Result of last maximization run (run %s): %s", str(maximizationrun) , scipy.optimize.tnc.RCSTRINGS[rc])
+    logger.info("Result of last maximization run (run %s): %s", 
+                str(maximization_run), scipy.optimize.tnc.RCSTRINGS[rc])
 
-    Xup = scipy.sparse.coo_matrix((Xupdata, (row, col)), shape=(N, N))
+    X_up = scipy.sparse.coo_matrix((X_up_data, (row, col)), shape=(N, N))
 
     # reconstruct full symmetric matrix from upper triangle part
-    X = Xup + Xup.T - scipy.sparse.spdiags(Xup.diagonal(), 0, Xup.shape[0], Xup.shape[1])
+    X = X_up + X_up.T - scipy.sparse.spdiags(X_up.diagonal(), 0, 
+                                             X_up.shape[0], X_up.shape[1])
 
-    finalLogLikelihood = log_likelihood(C, estimate_transition_matrix(X))
-    logger.info("Log-Likelihood of final reversible transition probability matrix: %s", finalLogLikelihood)
-    logger.info("Likelihood ratio: %s", np.exp(finalLogLikelihood - initialLogLikelihood))
+    final_log_likelihood = log_likelihood(C, estimate_transition_matrix(X))
+    logger.info("Log-Likelihood of final reversible transition probability "
+                "matrix: %s", final_log_likelihood)
+    logger.info("Likelihood ratio: %s", 
+                np.exp(final_log_likelihood - init_log_likelihood))
 
     # some  basic consistency checks
     if not np.alltrue(np.isfinite(X.data)):
@@ -893,17 +946,18 @@ def permute_mat(A, permutation):
     
     if sparse:
         
-        Pi = scipy.sparse.lil_matrix(A.shape)
+        pi = scipy.sparse.lil_matrix(A.shape)
         for i in range(A.shape[0]):
-            Pi[i,permutation[i]] = 1.0 # send i -> correct place
-        permuted_A = Pi * A * Pi.T
+            pi[i, permutation[i]] = 1.0  # send i -> correct place
+        permuted_A = pi * A * pi.T
         
     else:
         
-        Pi = np.zeros(A.shape)
+        pi = np.zeros(A.shape)
         for i in range(A.shape[0]):
-            Pi[i,permutation[i]] = 1.0 # send i -> correct place
-        permuted_A = np.dot( Pi, np.dot( A, Pi.T ) )
+            pi[i, permutation[i]] = 1.0  # send i -> correct place
+        #permuted_A = np.dot( Pi, np.dot( A, pi.T ) )
+        permuted_A = pi.dot(A.dot(pi.T))
     
     return permuted_A
 
@@ -916,60 +970,98 @@ def permute_mat(A, permutation):
 @deprecated(msm_analysis.is_transition_matrix, '2.7')
 def IsTransitionMatrix():
     pass
+
+
 @deprecated(msm_analysis.are_all_dimensions_same, '2.7')
 def AreAllDimensionsSame():
     pass
+
+
 @deprecated(msm_analysis.check_dimensions, '2.7')
 def CheckDimensions():
     pass
+
+
 @deprecated(msm_analysis.check_transition, '2.7')
 def CheckTransition():
     pass
+
+
 @deprecated(get_counts_from_traj, '2.7')
 def GetTransitionCountMatrixSparse():
     pass
+
+
 @deprecated(estimate_rate_matrix, '2.7')
 def EstimateRateMatrix():
     pass
+
+
 @deprecated(estimate_transition_matrix, '2.7')
 def EstimateTransitionMatrix():
     pass
+
+
 @deprecated(msm_analysis.check_for_bad_eigenvalues, '2.7')
 def CheckForBadEigenvalues():
     pass
+
+
 @deprecated(msm_analysis.get_eigenvectors, '2.7')
 def GetEigenvectors():
     pass
+
+
 @deprecated(msm_analysis.get_implied_timescales, '2.7')
 def GetImpliedTimescales():
     pass
+
+
 @deprecated(get_count_matrix_from_assignments, '2.7')
 def GetCountMatrixFromAssignments():
     pass
+
+
 @deprecated(msm_analysis.sample, '2.7')
 def Sample():
     pass
+
+
 @deprecated(msm_analysis.propagate_model, '2.7')
 def PropagateModel():
     pass
+
+
 @deprecated(apply_mapping_to_assignments, '2.7')
 def ApplyMappingToAssignments():
     pass
+
+
 @deprecated(apply_mapping_to_vector, '2.7')
 def ApplyMappingToVector():
     pass
+
+
 @deprecated(ergodic_trim, '2.7')
 def ErgodicTrim():
     pass
+
+
 @deprecated(mle_reversible_count_matrix, '2.7')
 def EstimateReversibleCountMatrix():
     pass
+
+
 @deprecated(log_likelihood, '2.7')
 def logLikelihood():
     pass
+
+
 @deprecated(renumber_states, '2.7')
 def RenumberStates():
     pass
+
+
 def GetEigenvectors_Right(*args, **kwargs):
     warnings.warn('GetEigenvectors_Right is deprecated use get_eigenvectors() with the keyword Right=True')
     kwargs['right'] = True

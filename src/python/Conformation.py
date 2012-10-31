@@ -22,6 +22,7 @@ import numpy as np
 from msmbuilder import pdb
 from msmbuilder.utils import deprecated
 
+
 class ConformationBaseClass(dict):
     """Base class for Trajectory and Conformation classes.  
     Not for separate use."""
@@ -32,7 +33,7 @@ class ConformationBaseClass(dict):
         
         keys_to_force_copy = ["ChainID", "AtomNames", "ResidueNames", "AtomID",
                               "ResidueID"]
-        for key in keys_to_force_copy: # To avoid overwriting something
+        for key in keys_to_force_copy:  # To avoid overwriting something
             self[key] = self[key].copy()
             
         self["ResidueNames"] = self["ResidueNames"].copy().astype("S4")
@@ -45,7 +46,7 @@ class ConformationBaseClass(dict):
             take the value 0, 1, ..., (n-1)
         where n is the number of residues.
         """
-        self["IndexList"] = [ [] for i in range(self.num_residues) ]
+        self["IndexList"] = [[] for i in range(self.num_residues)]
 
         zero_index_residue_id = self.get_enumerated_residue_id()
         for i in range(self.num_atoms):
@@ -84,7 +85,7 @@ class ConformationBaseClass(dict):
         atoms belong to residue 0, the next 3 belong to 1, etc.
         """
         unique_residue_ids = np.unique(self["ResidueID"])
-        residue_id_dict = dict([ [x,i] for i,x in 
+        residue_id_dict = dict([[x, i] for i,x in 
                                 enumerate(unique_residue_ids)])
         
         residue_ids = np.zeros(len(self["ResidueID"]), 'int')
@@ -98,6 +99,7 @@ class ConformationBaseClass(dict):
             self[key] = self[key][atom_indices]
 
         self.update_index_list()
+
 
 class Conformation(ConformationBaseClass):
     """A single biomolecule conformation.  Use classmethod load_from_pdb to 
@@ -121,4 +123,3 @@ class Conformation(ConformationBaseClass):
     def load_from_pdb(cls, filename):       
         """Create a conformation from a PDB File."""
         return cls(pdb.load_pdb(filename))
-
