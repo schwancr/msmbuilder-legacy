@@ -3,7 +3,7 @@ import scipy
 import scipy.linalg
 import scipy.optimize
 import scipy.stats
-import matplotlib
+import matplotlib.pyplot
 
 
 def GetFormat():
