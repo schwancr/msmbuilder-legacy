@@ -201,3 +201,16 @@ class CovarianceMatrix:
             return temp_mat, temp_mat_lag0
 
         return temp_mat
+
+class GramMatrix:
+    """ This class is similar to the covariance matrix, but it stores a Gram matrix using a 
+    particular kernel function (one of msmbuilder.kernels)"""
+
+    def __init__( self, kernel, store_in_memory=True ):
+        self.kernel = kernel
+        self.store_in_memory = store_in_memory
+
+    def calc_gram_matrix( self, trajectory ):
+        self.gram_matrix = self.kernel.all_to_all( trajectory )
+
+
