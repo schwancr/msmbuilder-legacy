@@ -1,5 +1,6 @@
 
 from scipy import signal
+import scipy
 import numpy as np
 import re, sys, os
 import multiprocessing as mp
@@ -206,11 +207,34 @@ class GramMatrix:
     """ This class is similar to the covariance matrix, but it stores a Gram matrix using a 
     particular kernel function (one of msmbuilder.kernels)"""
 
-    def __init__( self, kernel, store_in_memory=True ):
+    def __init__(self, kernel, store_in_memory=True):
         self.kernel = kernel
         self.store_in_memory = store_in_memory
 
-    def calc_gram_matrix( self, trajectory ):
-        self.gram_matrix = self.kernel.all_to_all( trajectory )
+    def calc_gram_matrices(self, prepared_traj_0, prepared_traj_dt):
 
+        self.M = len(prepared_traj_0)
+        self.gram_matrix_0 = self.kernel.all_to_all(prepared_traj_0, prepared_traj_0)
+        self.gram_matrix_dt = self.kernel.all_to_all(prepared_traj_0, prepared_traj_dt)
+        #self.gram_matrix_dt = np.concatenate([ self.kernel.one_to_all(prepared_traj_0, prepared_traj_dt, i) for i in xrange(self.M) ], axis=0)
 
+        return 
+
+    def get_centered_matrix(self, mat):
+
+        M = float(self.M)
+        print mat.shape
+        return mat - mat.sum(axis=0) / M - np.reshape(mat.sum(axis=1), (self.M, 1)) / M - \
+               mat.sum() / M / M
+
+    def get_eigensolution(self):
+        
+        K_dt = self.get_centered_matrix(self.gram_matrix_dt)
+        K_0 = self.get_centered_matrix(self.gram_matrix_0)
+
+        left_mat = K_dt.dot(K_0)
+        right_mat = K_0.dot(K_0)
+
+        eigensolution = scipy.linalg.eig(left_mat, b=right_mat)
+        
+        return eigensolution

@@ -37,7 +37,7 @@ if os.environ.get('READTHEDOCS', None) == 'True':
     import tempfile, shutil
     
     metadata['name'] = 'msmbuilder'
-    metadata['packages'] = ['msmbuilder', 'msmbuilder.scripts', 'msmbuilder.geometry', 'msmbuilder.metrics']
+    metadata['packages'] = ['msmbuilder', 'msmbuilder.scripts', 'msmbuilder.geometry', 'msmbuilder.metrics', 'msmbuilder.kernels']
     metadata['scripts'] = [e for e in glob('scripts/*.py') if not e.endswith('__.py')]
 
     # dirty, dirty trick to install "mock" packages
@@ -104,6 +104,9 @@ def configuration(parent_package='',top_path=None):
     # add metrics subpackage
     config.add_subpackage('metrics',
                           subpackage_path='src/python/metrics')
+    
+    config.add_subpackage('kernels',
+                          subpackage_path='src/python/kernels')
 
     #xtc reader
     xtc = Extension('msmbuilder.libxdrfile',

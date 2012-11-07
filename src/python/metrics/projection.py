@@ -57,7 +57,61 @@ class RedDimPNorm(Vectorized,AbstractDistanceMetric):
         def execute( self, ptraj ):
             return np.dot( ptraj.conj(), self.red_vecs )           
 
-    def __init__(self,proj_object_fn,pdb_fn=None,prep_with=None,abs_min=None,num_vecs=None, expl_var=None, metric='euclidean',p=2):
+    class KernelProjectionObject:
+        def __init__(self, proj_fn, kernel):
+            data_dict = io.loadh( proj_fn )
+
+            self.vecs = np.array( data_dict['vecs'].real)
+            self.vals = np.array( data_dict['vals'].real.astype(float) ) # These should be real already but have 1E-16j attached to them
+            self.gram_mat = np.array( data_dict['gram_mat'] )
+            self.trained_ptraj = np.array( data_dict['trained_ptraj'] )
+
+            dec_ind = np.argsort( self.vals )[::-1]
+
+            self.vecs = np.array( self.vecs[:,dec_ind] )
+            self.vals = np.array( self.vals[dec_ind] )
+
+            self.red_vecs = self.vecs # These containers will hold the reduced version of the matrix
+            self.red_vals = self.vals
+
+            self.kernel = kernel
+
+        def reduce( self, abs_min=None, num_vecs=None, expl_var=None ):
+
+            if num_vecs != None:
+                self.red_vecs = self.vecs[:,:num_vecs]
+                self.red_vals = self.vals[:num_vecs]
+            elif expl_var != None:
+                expl_var *= self.vals.sum() # Multiply by total variance to convert from the relative input to the absolute variance scale
+                N = np.where( np.cumsum( self.vals ) > expl_var )[0][0] # Get the first index that the total variance is greater than the input var
+                self.red_vecs = self.vecs[:,:N]
+                self.red_vals = self.vals[:N]
+            elif abs_min != None:
+                keep_ind = np.where( self.vals >= abs_min )[0] # For whatever reason, passing a tuple to the second axis in an nd.array adds an extra dimension
+                self.red_vecs = self.vecs[:,keep_ind]
+                self.red_vals = self.vals[keep_ind]
+
+            print "Kept %d out of %d total vectors" % ( self.red_vals.shape[0], self.vals.shape[0] )
+            print self.red_vals
+            return
+
+        def execute(self, ptraj):
+            gram_test = []
+            for frame_ind in xrange(ptraj.shape[0]):
+                gram_test.append( self.kernel.one_to_all( ptraj, self.trained_ptraj, frame_ind ) )
+
+            gram_test = np.array(gram_test)
+
+            test_frames, trained_frames = gram_test.shape
+
+            gram_test = gram_test - gram_test.sum(axis=0) / trained_frames - \
+                        np.reshape(gram_test.sum(axis=1), (test_frames,1)) / trained_frames + \
+                        gram_test.sum() / trained_frames / trained_frames
+
+            return gram_test.dot(self.red_vecs)
+
+    def __init__(self, proj_object_fn, pdb_fn=None, prep_with=None, kernel=False, abs_min=None,
+                 num_vecs=None, expl_var=None, metric='euclidean',p=2):
         """Inputs:
         1) proj_obj - A serializer object with keys 'vecs' and 'vals' corresponding to projection vectors and their 
                 corresponding eigenvalues. For example, these could be eigenvectors of the covariance metric
@@ -72,7 +126,12 @@ class RedDimPNorm(Vectorized,AbstractDistanceMetric):
         if proj_object_fn[-3:] == 'npy': # This is here because you can pickle an mdp.Node object and use it with this metric
             self.pca = np.load( proj_object_fn )
         else:
-            self.pca = self.ProjectionObject( proj_object_fn )
+
+            if not kernel:
+                self.pca = self.ProjectionObject(proj_object_fn)
+            else:
+                self.pca = self.KernelProjectionObject(proj_object_fn, prep_with)
+
             if num_vecs:
                 self.num_vecs = int( num_vecs )
             else:
