@@ -33,6 +33,12 @@ def run(kernel, project, atom_indices, out_fn, min_length, lag, stride):
     gram_mat.calc_gram_matrices(ptraj_0, ptraj_dt)
 
     vals, vecs = gram_mat.get_eigensolution()
+
+    # Need to normalize each of the vectors
+
+    norm_mat = np.sqrt(np.square(gram_mat.gram_matrix_0.dot(vecs)).sum(axis=0))
+
+    vecs /= norm_mat
     
     io.saveh(out_fn, vals=vals, vecs=vecs, gram_mat=gram_mat.gram_matrix_0, gram_mat_dt=gram_mat.gram_matrix_dt,
              trained_ptraj=ptraj_0) 
