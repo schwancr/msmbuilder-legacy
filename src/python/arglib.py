@@ -3,6 +3,7 @@ import argparse
 from msmbuilder.License import LicenseString
 from msmbuilder.Citation import CiteString
 from msmbuilder.metrics import parsers as metric_parsers
+from msmbuilder.kernels import parsers as kernel_parsers
 from pprint import pprint
 import warnings
 import logging
@@ -126,6 +127,7 @@ class ArgumentParser(object):
 
         self.extra_groups = []
         self.metric_parser_list = []
+        self.kernel_parser_list = []
 
         self.print_argparse_bug_warning = False
 
@@ -143,9 +145,15 @@ class ArgumentParser(object):
         else:
             self.get_basic_metric = False
 
-        if self.get_metric and self.get_basic_metric:
-            warnings.warn('You should only pass one of get_metric and get_basic_metric. See arglib.py for details.')
+        if 'get_kernel' in kwargs:
+            self.get_kernel = bool(kwargs.pop('get_kernel'))
+        else:
+            self.get_kernel = False
+
+        if (self.get_metric + self.get_basic_metric + self.get_kernel) > 1:
+            warnings.warn('You should only pass one of get_metric and get_basic_metric and get_kernel. See arglib.py for details.')
             self.get_basic_metric = False
+            self.get_kernel = False
 
         self.parser = argparse.ArgumentParser(*args, **kwargs)
 
@@ -156,6 +164,8 @@ class ArgumentParser(object):
             self.metric_parser_list = metric_parsers.add_metric_parsers( self, add_layer_metrics=True )
         elif self.get_basic_metric:
             self.metric_parser_list = metric_parsers.add_metric_parsers( self, add_layer_metrics=False )
+        elif self.get_kernel:
+            self.kernel_parser_list = kernel_parsers.add_kernel_parsers(self)
 
         self.parser.prog = os.path.split(sys.argv[0])[1]
         self.required = self.parser.add_argument_group(title='required arguments')
@@ -227,6 +237,9 @@ class ArgumentParser(object):
         if self.get_metric or self.get_basic_metric: # if we want to get the metric, then we have to construct it
             metric = metric_parsers.construct_metric(namespace)
             return namespace, metric
+        elif self.get_kernel:
+            kernel = kernel_parsers.construct_kernel(namespace)
+            return namespace, kernel
 
         return namespace
 

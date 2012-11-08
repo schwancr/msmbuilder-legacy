@@ -46,7 +46,7 @@ def run(kernel, project, atom_indices, out_fn, min_length, lag, stride):
     return
 
 if __name__ == '__main__':
-    parser = arglib.ArgumentParser(get_basic_metric=True)
+    parser = arglib.ArgumentParser(get_kernel=True)
     parser.add_argument('project')
     parser.add_argument('stride',help='stride to subsample input trajectories',type=int,default=1)
     parser.add_argument('atom_indices',help='atom indices to restrict trajectories to',default='all')
@@ -54,7 +54,7 @@ if __name__ == '__main__':
     parser.add_argument('delta_time',help='delta time to use in calclating the time-lag correlation matrix',type=int)
     parser.add_argument('min_length',help='only train on trajectories greater than some number of frames',type=int,default=0)
     
-    args, prep_metric = parser.parse_args()
+    args, kernel = parser.parse_args()
     
     arglib.die_if_path_exists(args.out_fn)
     
@@ -73,6 +73,5 @@ if __name__ == '__main__':
         logger.error( "Stride must be a divisor of dt..." )
         sys.exit()
 
-    kernel = DotProduct(prep_metric) 
     run(kernel, project, atom_indices, args.out_fn, min_length, lag, stride)
 
