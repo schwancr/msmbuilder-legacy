@@ -207,9 +207,15 @@ class GramMatrix:
     """ This class is similar to the covariance matrix, but it stores a Gram matrix using a 
     particular kernel function (one of msmbuilder.kernels)"""
 
-    def __init__(self, kernel, store_in_memory=True):
+    def __init__(self, kernel, store_in_memory=True, symmetrize=True, diagonal_load=0.0):
         self.kernel = kernel
         self.store_in_memory = store_in_memory
+
+        self.symmetrize = symmetrize
+        self.diagonal_load = diagonal_load
+        if self.diagonal_load < 0:
+            logger.warning("Negative diagonal load doesn't really make sense...")
+            raise Exception("Diagonal loading value must be non-negative")
 
     def calc_gram_matrices(self, prepared_traj_0, prepared_traj_dt):
 
@@ -220,20 +226,32 @@ class GramMatrix:
 
         return 
 
-    def get_centered_matrix(self, mat):
+    def get_centered_matrices(self):
 
-        M = float(self.M)
-        print mat.shape
-        return mat - mat.sum(axis=0) / M - np.reshape(mat.sum(axis=1), (self.M, 1)) / M - \
-               mat.sum() / M / M
+        Mf = float(self.M)
+        # Need to center our matrices, otherwise PCA / tICA doesn't work
+        K_dt = self.gram_matrix_dt
+        K_0 = self.gram_matrix_0
+
+        K_dt_cent = K_dt - K_dt.sum(axis=0) / Mf - np.reshape(K_0.sum(axis=1), (-1,1)) / Mf + \
+                    K_0.sum() / Mf / Mf
+
+        K_0_cent = K_0 - K_0.sum(axis=0) / Mf - np.reshape(K_0.sum(axis=1), (-1,1)) / Mf + \
+                   K_0.sum() / Mf / Mf
+
+        return K_0_cent, K_dt_cent
 
     def get_eigensolution(self):
-        
-        K_dt = self.get_centered_matrix(self.gram_matrix_dt)
-        K_0 = self.get_centered_matrix(self.gram_matrix_0)
 
+        K_0, K_dt = self.get_centered_matrices()
+        
         left_mat = K_dt.dot(K_0)
+        if self.symmetrize:
+            left_mat = 0.5 * ( left_mat + left_mat.T )
+
         right_mat = K_0.dot(K_0)
+        if self.diagonal_load != 0:
+            right_mat += np.eye( right_mat.shape[0] ) * self.diagonal_load
 
         eigensolution = scipy.linalg.eig(left_mat, b=right_mat)
         

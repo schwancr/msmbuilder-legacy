@@ -3,6 +3,8 @@
 from msmbuilder import arglib, sshfs_tools, tICA
 from msmbuilder.kernels.dotproduct import DotProduct
 from msmbuilder import Project, Trajectory, io
+from msmbuilder.Trajectory import _convert_from_lossy_integers, DEFAULT_PRECISION
+import tables
 import numpy as np
 import scipy
 import os, sys, re
@@ -10,35 +12,74 @@ import scipy
 import logging
 logger = logging.getLogger( __name__ )
 
-def run(kernel, project, atom_indices, out_fn, min_length, lag, stride):
+def run(kernel, project, atom_indices, out_fn, dt, num_samples):
 
-    # First load all of the data into memory:
+    # First sample the dataset into memory:
     
-    ptraj_0 = []
-    ptraj_dt = []
+    traj_inds = np.concatenate([ [i]*project.traj_lengths[i] for i in xrange(project.n_trajs) ])
 
-    for i in xrange(project.n_trajs):
-        logger.info("Loading trajectory %d", i)
+    frame_inds = np.concatenate([ np.arange(project.traj_lengths[i]) for i in xrange(project.n_trajs) ])
 
-        traj = project.load_traj(i, atom_indices=atom_indices, stride=stride)
-        temp_ptraj = kernel.prepare_trajectory(traj)
+    which_inds = np.array(zip(traj_inds, frame_inds))
 
-        ptraj_0.extend(temp_ptraj[:-lag])
-        ptraj_dt.extend(temp_ptraj[lag:])
+    sampled_inds = np.random.permutation(np.arange(len(which_inds)))
+    sampled_inds_dt = sampled_inds + dt
 
-    ptraj_0 = np.array(ptraj_0)
-    ptraj_dt = np.array(ptraj_dt)
+    good_inds = np.where(sampled_inds_dt < len(which_inds))
+    sampled_inds = sampled_inds[good_inds]
+    sampled_inds_dt = sampled_inds_dt[good_inds]
 
-    gram_mat = tICA.GramMatrix(kernel)
+    permuted_which = which_inds[sampled_inds]
+    permuted_which_dt = which_inds[sampled_inds_dt]
+
+    good_inds = np.where( permuted_which[:,0] == permuted_which_dt[:,0] )
+
+    permuted_which = permuted_which[good_inds][:num_samples]
+    permuted_which_dt = permuted_which_dt[good_inds][:num_samples]
+
+    traj_0 = project.empty_traj()
+    traj_dt = project.empty_traj()
+
+    for traj_ind in np.unique(np.concatenate((permuted_which[:,0], permuted_which_dt[:,0]))):
+        F = tables.openFile(project.traj_filename(traj_ind))
+        frame_inds = permuted_which[:,1][ np.where(permuted_which[:,0] == traj_ind) ]
+        logger.info("Loading %d frames from trajectory %s", len(frame_inds), project.traj_filename(traj_ind))
+        for i in frame_inds:
+            if traj_0['XYZList'] is None:
+                traj_0['XYZList'] = np.array([ F.root.XYZList[i] ])
+            else:
+                traj_0['XYZList'] = np.vstack([ traj_0['XYZList'], np.array([ F.root.XYZList[i] ]) ])
+
+        frame_inds = permuted_which_dt[:,1][ np.where(permuted_which_dt[:,0] == traj_ind) ]
+        for i in frame_inds:
+            if traj_dt['XYZList'] is None:
+                traj_dt['XYZList'] = np.array([ F.root.XYZList[i] ])
+            else:
+                traj_dt['XYZList'] = np.vstack([ traj_dt['XYZList'], np.array([ F.root.XYZList[i] ]) ])
+        
+        F.close()
+
+    traj_0['XYZList'] = _convert_from_lossy_integers( traj_0['XYZList'], DEFAULT_PRECISION )
+    traj_dt['XYZList'] = _convert_from_lossy_integers( traj_dt['XYZList'], DEFAULT_PRECISION )
+    ptraj_0 = kernel.prepare_trajectory(traj_0)
+    ptraj_dt = kernel.prepare_trajectory(traj_dt)
+
+    gram_mat = tICA.GramMatrix(kernel, symmetrize=True, diagonal_load=0.0)
+    # Still need to figure out how to pick the diagonally loading parameter...
     gram_mat.calc_gram_matrices(ptraj_0, ptraj_dt)
 
     vals, vecs = gram_mat.get_eigensolution()
 
+    print np.sort(vals)[::-1][:10]
+
     # Need to normalize each of the vectors
 
-    norm_mat = np.sqrt(np.square(gram_mat.gram_matrix_0.dot(vecs)).sum(axis=0))
+    K_0, K_dt = gram_mat.get_centered_matrices()
 
-    vecs /= norm_mat
+    norm_mat = np.sqrt(np.square(K_0.dot(vecs)).sum(axis=0))
+    #norm_mat = np.sqrt(np.square(gram_mat.gram_matrix_0.dot(vecs)).sum(axis=0))
+
+    vecs /= np.reshape(norm_mat, (1,-1))  # Be sure it is a row vector
     
     io.saveh(out_fn, vals=vals, vecs=vecs, gram_mat=gram_mat.gram_matrix_0, gram_mat_dt=gram_mat.gram_matrix_dt,
              trained_ptraj=ptraj_0) 
@@ -48,11 +89,12 @@ def run(kernel, project, atom_indices, out_fn, min_length, lag, stride):
 if __name__ == '__main__':
     parser = arglib.ArgumentParser(get_kernel=True)
     parser.add_argument('project')
-    parser.add_argument('stride',help='stride to subsample input trajectories',type=int,default=1)
+    parser.add_argument('num_samples',help='number of samples to grab from the data. Note that we '
+                                           'need to diagonalize a square matrix of this size, so this'
+                                           ' can\'t be too big...',type=int,default=1000)
     parser.add_argument('atom_indices',help='atom indices to restrict trajectories to',default='all')
-    parser.add_argument('out_fn',help='output filename to save results to',default='tICAData.h5')
+    parser.add_argument('out_fn',help='output filename to save results to',default='ktICAData.h5')
     parser.add_argument('delta_time',help='delta time to use in calclating the time-lag correlation matrix',type=int)
-    parser.add_argument('min_length',help='only train on trajectories greater than some number of frames',type=int,default=0)
     
     args, kernel = parser.parse_args()
     
@@ -63,15 +105,9 @@ if __name__ == '__main__':
     except: 
         atom_indices = None
 
-    stride = int( args.stride )
     dt = int( args.delta_time )
+    num_samples = int( args.num_samples )
     project = Project.load_from( args.project )
-    min_length = int( float( args.min_length ) ) # need to convert to float first because int can't convert a string that is '1E3' for example...wierd.
-    lag = int( dt / stride )
 
-    if float(dt)/stride != lag:
-        logger.error( "Stride must be a divisor of dt..." )
-        sys.exit()
-
-    run(kernel, project, atom_indices, args.out_fn, min_length, lag, stride)
+    run(kernel, project, atom_indices, args.out_fn, dt, num_samples)
 

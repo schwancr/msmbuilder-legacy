@@ -1,6 +1,6 @@
 
 from msmbuilder.metrics.parsers import add_argument, add_basic_metric_parsers, construct_basic_metric
-from msmbuilder.kernels import DotProduct, Gaussian
+from msmbuilder.kernels import DotProduct, Gaussian, Polynomial
 
 def add_kernel_parsers(parser):
     
@@ -59,5 +59,11 @@ def construct_layer_kernel(kernel_name, args):
 
         return Gaussian(sub_metric, std_dev=args.std_dev)
 
+    elif kernel_name == 'polynomial':
+        sub_metric = construct_basic_metric(args.sub_metric, args)
+
+        return Polynomial(sub_metric, power=args.poly_deg)
+
 def construct_kernel(args):
     return construct_layer_kernel(args.kernel, args)
+
