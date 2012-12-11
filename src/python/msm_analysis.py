@@ -725,7 +725,7 @@ def check_dimensions(*args):
     if are_all_dimensions_same(*args)==False:
         raise RuntimeError("All dimensions are not the same")
 
-def resample_t_matrix(t_matrix, counts_per_state, num_samples=10):
+def resample_t_matrix_by_row(t_matrix, counts_per_state, num_samples=10):
     """Resample a transition probability matrix by state. This will
     generate a new counts matrix based on your transition probabilities
     then construct a new transition probability matrix on these counts.
@@ -768,7 +768,32 @@ def resample_t_matrix(t_matrix, counts_per_state, num_samples=10):
         for i in xrange(num_samples):
             sampled_c_matrices[i][row_ind,:] = sampled_rows[i]
         
-    return sampled_c_matrix
+    return sampled_c_matrices
     
-#def get_eigen_error_resample(t_matrix, counts_per_state, num_vals=10, num_samples=10, 
-#    """Re-sample transition matrices and determine the 
+def resample_c_matrix(c_matrix, num_samples=10):
+    """Resample a transition matrix. This will generate a new counts 
+    matrix based on your transition probabilities then construct a 
+    new transition probability matrix on these counts.
+    
+    Parameters
+    ----------
+    t_matrix : dense or sparse matrix
+        This should contain your transition probability matrix from your MSM
+
+    Returns
+    -------
+    sampled_c_matrices : list of sparse matrices
+        The resampled counts matrix   
+    """
+
+    t_matrix = c_matrix / c_matrix.sum()
+
+    sampled_counts = np.random.multinomial(c_matrix.sum(), t_matrix.data,
+                                           size=num_samples)
+    nonzero_indices = c_matrix.nonzero()
+    # The above contains the locations of observed counts in c_matrix
+    sampled_c_matrices = [scipy.sparse.csr_matrix((sampled_counts[i], nonzero_indices))
+                          for i in xrange(num_samples)]
+
+    return sampled_c_matrices
+    
