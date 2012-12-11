@@ -69,7 +69,7 @@ class test_ConvertDataToHDF(WTempdir):
         fh = tarfile.open(xtc_fn, mode='r:gz')
         fh.extractall(self.td)
         fh.close()
-
+    
         outfn = pjoin(self.td, 'ProjectInfo.yaml')
         # mode to that directory
         os.chdir(self.td)
