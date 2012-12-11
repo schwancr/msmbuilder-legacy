@@ -236,7 +236,7 @@ class Trajectory(ConformationBaseClass):
         precision: float, optional
             I'm not really sure what this does (RTM 6/27).
         """
- 
+
         if os.path.exists(filename):
             raise IOError("%s already exists" % filename)
 
@@ -333,7 +333,7 @@ class Trajectory(ConformationBaseClass):
         ----------
         filename: str
             location to find a single conformation to append
-    
+
         """
 
         self += Trajectory.load_from_pdb(filename)
@@ -380,7 +380,7 @@ class Trajectory(ConformationBaseClass):
         shape: tuple
             shape of the trajectory if just_inspect=True
         """
-        
+
         # temp_traj is the to be trajectory object, but each key is added in 
         # steps, so it is not complete until the very end
         if pdb_filename != None:
@@ -520,7 +520,8 @@ class Trajectory(ConformationBaseClass):
         - atom_indices [None]: np.ndarray of atom indices to read in 
             (0-indexed)
         - chunk_size [100000]: Integer number of frames to read in a chunk
-            NOTE: chunk_size will change in order to be a multiple of the input                   stride. This is necessary in order to make sure the Stride 
+            NOTE: chunk_size will change in order to be a multiple of the input 
+                  stride. This is necessary in order to make sure the Stride 
                   and chunks line up
 
         Outputs:
@@ -564,7 +565,7 @@ class Trajectory(ConformationBaseClass):
             temp_traj['ResidueID'] = np.array(file_obj.root.ResidueID[:], 
                                               dtype=np.int32)
             temp_traj['ResidueNames'] = np.array(file_obj.root.ResidueNames[:])
-            
+
         # IndexList will be generated when the Trajectory object is 
         # instantiated
 
@@ -767,17 +768,17 @@ class Trajectory(ConformationBaseClass):
         """Loads a trajectory into memory, automatically deciding which methods
         to call based on filetype.  For XTC files, this method uses a 
         pre-registered Conformation filename as a pdb."""
-        
+
         extension = os.path.splitext(filename)[1]
-        
+
         # check to see if we're supposed to load only a subset of the atoms
         if atom_indices != None:
             if (extension == '.lh5') or (extension == '.h5'):
-                pass # we deal with this below
+                pass  # we deal with this below
             else:
                 raise NotImplementedError('AtomIndices kwarg option only'
                                           'available for .lh5 & .h5 format')
-            
+
         # if we're not going to load a subset of the atoms, then proceed 
 
         elif extension == '.xtc':
@@ -877,7 +878,6 @@ class Trajectory(ConformationBaseClass):
 
         return trajectory
 
-
     @deprecated(load_trajectory_file, '2.7')
     def LoadTrajectoryFile(cls, trajectory_file):
-        return cls.load_trajectory_file( trajectory_file )
+        return cls.load_trajectory_file(trajectory_file)

@@ -1,4 +1,3 @@
-
 import time
 
 import numpy as np
@@ -51,18 +50,19 @@ def contact_reaction_coordinate(trajectory, weights):
         The reaction coordinate value for each snapshot of `trajectory`
     """
 
-    if TIME: starttime = time.clock()
+    if TIME: 
+        starttime = time.clock()
 
     # make an array of all pairwise C-alpha indices
-    C_alphas = np.where( trajectory['AtomNames'] == 'CA' )[0] # indices of the Ca atoms
+    C_alphas = np.where(trajectory['AtomNames'] == 'CA')[0] # indices of the Ca atoms
     n_residues = len(C_alphas)
-    atom_contacts = np.zeros(( n_residues**2, 2 ))
-    atom_contacts[:,0] = np.repeat( C_alphas, n_residues )
-    atom_contacts[:,1] = np.tile( C_alphas, n_residues )
+    atom_contacts = np.zeros((n_residues**2, 2))
+    atom_contacts[:, 0] = np.repeat(C_alphas, n_residues)
+    atom_contacts[:, 1] = np.tile(C_alphas, n_residues)
 
     # calculate the distance between all of those pairs
     distance_array = atom_distances(trajectory['XYZList'], atom_contacts)
-    rc_value = np.sum( distance_array * weights.T, axis=1 )
+    rc_value = np.sum(distance_array * weights.T, axis=1)
 
     if TIME:
         endtime = time.clock()
@@ -96,13 +96,12 @@ class CutCoordinate(object):
         """
 
         # store the basic values
-        self.counts     = counts
+        self.counts = counts
         self.generators = generators
-        self.reactant   = reactant
-        self.product    = product
+        self.reactant = reactant
+        self.product = product
         self.N = counts.shape[0]
         self.reaction_coordinate_values = None
-
 
     def _check_coordinate_values(self):
         """
@@ -118,7 +117,6 @@ class CutCoordinate(object):
                             "\n-- set_coordinate_as_eigvector2")
         return
 
-
     def set_coordinate_values(self, coordinate_values):
         """
         Set the reaction coordinate manually, by providing coordinate values
@@ -132,7 +130,6 @@ class CutCoordinate(object):
         self.reaction_coordinate_values = coordinate_values
         self.evaluate_partition_functions()
         return
-
 
     def set_coordinate_as_committors(self, lag_time=1, symmetrize='transpose'):
         """
@@ -158,7 +155,6 @@ class CutCoordinate(object):
                                                                    t_matrix)
         return
 
-
     def set_coordinate_as_eigvector2(self, lag_time=1, symmetrize='transpose'):
         """
         Set the reaction coordinate to be the second eigenvector of the MSM generated
@@ -177,10 +173,9 @@ class CutCoordinate(object):
 
         t_matrix = MSMLib.build_msm_from_counts(self.counts, lag_time, symmetrize)
         v, w = get_eigenvectors(t_matrix, 5)
-        self.reaction_coordinate_values = w[:,1].flatten()
+        self.reaction_coordinate_values = w[:, 1].flatten()
 
         return
-
 
     def reaction_mfpt(self, lag_time=1.0):
         """
@@ -198,7 +193,8 @@ class CutCoordinate(object):
             The mean first passage time between the `reactant` and `product`
         """
 
-        if TIME: starttime = time.clock()
+        if TIME: 
+            starttime = time.clock()
 
         self._check_coordinate_values()
 
@@ -251,7 +247,7 @@ class CutCoordinate(object):
         }
         Py_END_ALLOW_THREADS
         """, ['tau_parallel', 'N', 'intermediate_states', 'zc', 'zh', 'rc'],
-        extra_link_args = ['-lgomp'], extra_compile_args = ["-O3", "-fopenmp"])
+        extra_link_args=['-lgomp'], extra_compile_args=["-O3", "-fopenmp"])
 
         mfpt = const * tau_parallel
 
@@ -260,7 +256,6 @@ class CutCoordinate(object):
             print "Time spent in MFPT:", endtime - starttime
 
         return mfpt
-
 
     def evaluate_partition_functions(self):
         """
@@ -291,7 +286,8 @@ class CutCoordinate(object):
             barrier along that coordinate.
         """
 
-        if TIME: starttime = time.clock()
+        if TIME: 
+            starttime = time.clock()
         self._check_coordinate_values()
 
         # permute the counts matrix to order it with the rxn coordinate
@@ -333,10 +329,10 @@ class CutCoordinate(object):
             }
         }
         Py_END_ALLOW_THREADS
-        """, ['N', 'data', 'indices', 'indptr', 'zc'], extra_link_args = ['-lgomp'],
-        extra_compile_args = ["-O3", "-fopenmp"])
+        """, ['N', 'data', 'indices', 'indptr', 'zc'], extra_link_args=['-lgomp'],
+        extra_compile_args=["-O3", "-fopenmp"])
 
-        zc /= 2.0 # we overcounted in the above - fix that
+        zc /= 2.0  # we overcounted in the above - fix that
 
         # put stuff back in the original order
         inv_ordering = np.argsort(state_order_along_RC)
@@ -353,7 +349,6 @@ class CutCoordinate(object):
             print "Time spent in zc:", endtime - starttime
 
         return
-
 
     def rescale_to_natural_coordinate(self):
         """
@@ -386,14 +381,13 @@ class CutCoordinate(object):
         scaled_z = np.cumsum(zc)
         positive_inds = np.where(scaled_z > 0.0)
         scaled_z = scaled_z[positive_inds]
-        natural_coordinate = np.cumsum( zh[positive_inds] / (scaled_z * np.sqrt(np.pi)) )
+        natural_coordinate = np.cumsum(zh[positive_inds] / (scaled_z * np.sqrt(np.pi)))
 
         self.zc = natural_coordinate
         self.zh = natural_coordinate
         self.reaction_coordinate_values = scaled_z
 
         return
-
 
     def plot(self, num_bins=15, filename=None):
         """
@@ -421,13 +415,13 @@ class CutCoordinate(object):
 
         # performing a sliding average
         h = self.reaction_coordinate_values.max() / float(num_bins)
-        bins = [ i*h for i in range(num_bins) ]
+        bins = [i * h for i in range(num_bins)]
 
-        inds = np.digitize( self.reaction_coordinate_values, bins )
-        pops = [ np.sum( self.zc[np.where( inds == i )] ) for i in range(num_bins) ]
+        inds = np.digitize(self.reaction_coordinate_values, bins)
+        pops = [np.sum(self.zc[np.where(inds == i)]) for i in range(num_bins)]
 
         fig = plt.figure()
-        plt.plot(bins, -1.0 * np.log( pops ), lw=2)
+        plt.plot(bins, -1.0 * np.log(pops), lw=2)
         plt.xlabel('Reaction Coordinate')
         plt.ylabel('Free Energy Profile (kT)')
 
@@ -440,7 +434,6 @@ class CutCoordinate(object):
         return
 
 
-
 class VariableCoordinate(CutCoordinate):
     """
     Class that contains methods for calculating cut-based free energy profiles
@@ -451,7 +444,6 @@ class VariableCoordinate(CutCoordinate):
     `alphas`. Then we might hope to optimize that reaction coordinate by wisely
     choosing those weights.
     """
-
 
     def __init__(self, rxn_coordinate_function, initial_alphas, counts,
                  generators, reactant, product):
@@ -492,7 +484,6 @@ class VariableCoordinate(CutCoordinate):
         self.rc_alphas = initial_alphas
         self._evaluate_reaction_coordinate()
 
-
     def _evaluate_reaction_coordinate(self):
         """
         Evaluates `rxn_coordinate_function` and stores the values obtained in a
@@ -500,7 +491,6 @@ class VariableCoordinate(CutCoordinate):
         """
         self.reaction_coordinate_values = self.rxn_coordinate_function(self.generators, self.rc_alphas)
         return
-
 
     def optimize(self, maxiter=1000):
         """
@@ -533,14 +523,15 @@ class VariableCoordinate(CutCoordinate):
             mfpt = self.reaction_mfpt(lag_time=1.0)
 
             endtime = time.clock()
-            if TIME: "Iteration %d, time: %f" % (self.i, endtime-starttime)
+            if TIME: 
+                print "Iteration %d, time: %f" % (self.i, endtime - starttime)
             self.i += 1
 
             return -1.0 * mfpt
 
-        optimal_alphas = scipy.optimize.fmin_cg( objective, self.rc_alphas,
-                                                 args=(self.generators,),
-                                                 maxiter=maxiter )
+        optimal_alphas = scipy.optimize.fmin_cg(objective, self.rc_alphas,
+                                                args=(self.generators,),
+                                                 maxiter=maxiter)
 
         self.rc_alphas = optimal_alphas
         self._evaluate_reaction_coordinate()
@@ -556,11 +547,11 @@ def test():
     print "Testing cfep code...."
 
     test_dir = '/Users/TJ/Programs/msmbuilder.sandbox/tjlane/cfep/'
-    
+
     generators = Trajectory.load_trajectory_file(test_dir + 'Gens.lh5')
     counts = io.mmread(test_dir + 'tCounts.mtx')
-    reactant = 0    # generator w/max RMSD
-    product = 10598 # generator w/min RMSD
+    reactant = 0     # generator w/max RMSD
+    product = 10598  # generator w/min RMSD
     pfolds = np.loadtxt(test_dir + 'FCommittors.dat')
 
     # test the usual coordinate
@@ -577,7 +568,7 @@ def test():
     #pfold_cfep.plot()
 
     # test the Variable Coordinate
-    initial_weights = np.ones( (1225,26104) )
+    initial_weights = np.ones((1225, 26104))
 
     contact_cfep = VariableCoordinate(contact_reaction_coordinate, initial_weights,
                                       counts, generators, reactant, product)
@@ -590,7 +581,6 @@ def test():
     print "Finished optimization"
 
     contact_cfep.plot()
-
 
     return
 

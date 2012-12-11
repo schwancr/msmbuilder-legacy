@@ -39,11 +39,10 @@ logger = logging.getLogger(__name__)
 # turn on debugging printout
 # logger.setLogLevel(logging.DEBUG)
 
-
-
 ###############################################################################
 # Typechecking/Utility Functions
 #
+
 
 def _ensure_iterable(arg):
     if not hasattr(arg, '__iter__'):
@@ -52,6 +51,7 @@ def _ensure_iterable(arg):
                      " converted it to: %s" % str(arg))
     assert hasattr(arg, '__iter__')
     return arg
+
 
 def _check_sources_sinks(sources, sinks):
     sources = _ensure_iterable(sources)
@@ -134,7 +134,7 @@ def find_top_paths(sources, sinks, tprob, num_paths=10, node_wipe=False, net_flu
     while not done:
 
         # First find the highest flux pathway
-        (path, (b1,b2), flux) = _backtrack(sinks, b, pi, net_flux)
+        (path, (b1, b2), flux) = _backtrack(sinks, b, pi, net_flux)
 
         # Add each result to a Paths, Bottlenecks, Fluxes list
         if flux == 0:

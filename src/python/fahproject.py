@@ -36,6 +36,7 @@ make_methods_pickable()
 import logging
 logger = logging.getLogger(__name__)
 
+
 class FahProject(object):
     """
     A generic class for interacting with Folding@home projects
@@ -62,19 +63,19 @@ class FahProject(object):
                  work_server=None, email=None):
 
         # metadata associated with a FAH project
-        self.project_number   = project_number
-        self.work_server      = work_server
-        self.pdb_topology     = pdb
-        self.manager_email    = email
+        self.project_number = project_number
+        self.work_server = work_server
+        self.pdb_topology = pdb
+        self.manager_email = email
         self.projectinfo_file = projectinfo_file
 
-		# check that the PDB exists
+        # check that the PDB exists
         if not os.path.exists(self.pdb):
             logger.error("Cannot find %s", self.pdb)
 
         # load in the memory state
-        if os.path.exists( projectinfo_file ):
-            self.load_memory_state( projectinfo_file )
+        if os.path.exists(projectinfo_file):
+            self.load_memory_state(projectinfo_file)
         else:
             self.memory = {}
             logger.info("No file: %s found. Generating new memory state.", projectinfo_file)
@@ -83,8 +84,7 @@ class FahProject(object):
         # set the nested classes defined below to be separate namespaces
         # this should separate concerns and prevent (dangerous) user mistakes
         self.retrieve = _retrieve(self)
-        self.inject   = _inject(self)
-
+        self.inject = _inject(self)
 
     def restart_server(self):
         """
@@ -98,7 +98,7 @@ class FahProject(object):
 
         # restart the server, wait 60s to let it come back up
         logger.warning("Restarting server: %s", self.work_server)
-        stop_cmd  = "/etc/init.d/FAHWorkServer-%s stop" % self.work_server
+        stop_cmd = "/etc/init.d/FAHWorkServer-%s stop" % self.work_server
         start_cmd = "/etc/init.d/FAHWorkServer-%s start" % self.work_server
         r = subprocess.call(stop_cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         time.sleep(60)
@@ -106,7 +106,7 @@ class FahProject(object):
 
         # check that we came back up OK, if not freak out
         processname = "FAHWorkServer-%s" % self.work_server
-        is_alive = False # guilty until proven innocent
+        is_alive = False  # guilty until proven innocent
 
         for line in os.popen("ps -a"):
             if line.find(processname) > 0:
@@ -120,12 +120,11 @@ class FahProject(object):
 
                     Recommend you attend to this immediately.""" % self.workserver
 
-            if email: send_error_email(self, error_msg)
+            if email: 
+                send_error_email(self, error_msg)
             raise Exception(error_msg)
 
         return
-
-
 
     def send_error_email(self, error_msg):
         """
@@ -157,7 +156,6 @@ class FahProject(object):
 
         return
 
-
     def save_memory_state(self):
         """
         Saves the 'memory state' to disk in a serialized format.
@@ -173,12 +171,11 @@ class FahProject(object):
         load_memory_state
         """
 
-        project_info = Project.load_from_hdf( projectinfo_file )
-        project_info["Memory"] = cPickle.dumps( self.memory )
+        project_info = Project.load_from_hdf(projectinfo_file)
+        project_info["Memory"] = cPickle.dumps(self.memory)
         project_info.save_to_hdf( projectinfo_file, do_file_check=False )
 
         return
-
 
     def load_memory_state(self, projectinfo_file):
         """

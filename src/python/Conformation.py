@@ -30,12 +30,12 @@ class ConformationBaseClass(dict):
         """Initialize object.  Optionally include data from a dictionary 
         object dict_like."""
         super(ConformationBaseClass, self).__init__(dict_like)
-        
+
         keys_to_force_copy = ["ChainID", "AtomNames", "ResidueNames", "AtomID",
                               "ResidueID"]
         for key in keys_to_force_copy:  # To avoid overwriting something
             self[key] = self[key].copy()
-            
+
         self["ResidueNames"] = self["ResidueNames"].copy().astype("S4")
         self.update_index_list()
 
@@ -85,9 +85,9 @@ class ConformationBaseClass(dict):
         atoms belong to residue 0, the next 3 belong to 1, etc.
         """
         unique_residue_ids = np.unique(self["ResidueID"])
-        residue_id_dict = dict([[x, i] for i,x in 
+        residue_id_dict = dict([[x, i] for i, x in 
                                 enumerate(unique_residue_ids)])
-        
+
         residue_ids = np.zeros(len(self["ResidueID"]), 'int')
         for i in xrange(self.num_atoms):
             residue_ids[i] = residue_id_dict[self["ResidueID"][i]]
@@ -112,13 +112,13 @@ class Conformation(ConformationBaseClass):
     def restrict_atom_indices(self, atom_indices):
         ConformationBaseClass.restrict_atom_indices(self, atom_indices)
         self["XYZ"] = self["XYZ"][atom_indices]
-        
+
     def save_to_pdb(self, filename):
         """Write conformation as a PDB file."""
         pdb.write_pdb_conformation(filename, self["AtomID"], self["AtomNames"],
                                    self["ResidueNames"], self["ResidueID"],
                                    self["XYZ"], self["ChainID"])
-        
+
     @classmethod
     def load_from_pdb(cls, filename):       
         """Create a conformation from a PDB File."""

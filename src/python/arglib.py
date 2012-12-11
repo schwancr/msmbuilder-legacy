@@ -1,4 +1,5 @@
-import sys, os
+import sys
+import os
 import argparse
 from msmbuilder.License import LicenseString
 from msmbuilder.Citation import CiteString
@@ -7,6 +8,7 @@ from pprint import pprint
 import warnings
 import logging
 logger = logging.getLogger(__name__)
+
 
 def _iter_both_cases(string):
     """Iterate over the chars in a strings in both cases
@@ -154,7 +156,6 @@ class ArgumentParser(object):
 
         for v in RESERVED.values():
             self.short_strings.add(v[0])
-
 
     def add_argument_group(self, title):
         self.extra_groups.append(self.parser.add_argument_group(title=title))

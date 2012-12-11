@@ -41,9 +41,10 @@ import tables
 
 try:
     COMPRESSION = tables.Filters(complevel=9, complib='blosc', shuffle=True)
-except Exception: #type?
+except Exception:  # type?
     warnings.warn("Missing BLOSC; no compression will used.")
     COMPRESSION = tables.Filters()
+
 
 def saveh(file, *args, **kwargs):
     """
@@ -72,20 +73,19 @@ def saveh(file, *args, **kwargs):
     Returns
     -------
     None
-    
+
     Raises
     ------
     IOError
         On attempted overwriting
     TypeError
         When arrays are of an unsupported type
-    
+
     See Also
     --------
     numpy.savez : Saves files in uncompressed .npy format
     """
 
-    
     if isinstance(file, basestring):
         handle = tables.openFile(file, 'a')
         own_fid = True
@@ -95,7 +95,7 @@ def saveh(file, *args, **kwargs):
                 'or an open tables.File: %s' % file)
         handle = file
         own_fid = False
-    
+
     # name all the arrays
     namedict = kwargs
     for i, val in enumerate(args):
@@ -104,13 +104,13 @@ def saveh(file, *args, **kwargs):
             raise ValueError('Cannot use un-named variables '
                 ' and keyword %s' % key)
         namedict[key] = val
-    
+
     # ensure that they don't already exist
     current_nodes = [e.name for e in handle.listNodes(where='/')]
     for key in namedict.keys():
         if key in current_nodes:
             raise IOError('Array already exists in file: %s' % key)
-    
+
     # save all the arrays
     try: 
         for key, val in namedict.iteritems():
@@ -126,22 +126,22 @@ def saveh(file, *args, **kwargs):
             node = handle.createCArray(where='/', name=key,
                 atom=atom, shape=val.shape, filters=COMPRESSION)
             node[:] = val
-    
+
     except Exception:
         handle.close()
         if own_fid:
             os.unlink(file)
         raise  
-        
+
     handle.flush()
     if own_fid:
         handle.close()
 
-    
+
 def loadh(file, name=Ellipsis, deferred=True):
     """
     Load an array(s) from .hdf format files
-    
+
     Parameters
     ----------
     file : string or tables.File
@@ -153,14 +153,14 @@ def loadh(file, name=Ellipsis, deferred=True):
     deferred : bool, optional
         If true, and you did not request just a single name, the result will
         be lazyily loaded.
-    
+
     Returns
     -------
     result : array or dict-like
         If name is a single string, a single array will be returned. Otherwise,
         the return value is a dict-like mapping the name(s) to the array(s) of
         data.
-    
+
     Raises
     ------
     IOError
@@ -168,7 +168,7 @@ def loadh(file, name=Ellipsis, deferred=True):
     KeyError
         If the request name does not exist
     """
-    
+
     if isinstance(file, basestring):
         handle = tables.openFile(file, mode='r')
         own_fid = True
@@ -178,7 +178,7 @@ def loadh(file, name=Ellipsis, deferred=True):
                 'or an open tables.File: %s' % file)
         handle = file
         own_fid = False
-    
+
     # if name is a single string, deferred loading is not used
     if isinstance(name, basestring):
         try:
@@ -186,12 +186,12 @@ def loadh(file, name=Ellipsis, deferred=True):
         except tables.NoSuchNodeError:
             raise KeyError('Node "%s" does not exist '
                 'in file %s' % (name, file))
-        
+
         return_value = np.array(node[:])
         if own_fid:
             handle.close()
         return return_value
-    
+
     if not deferred:
         result = {}
         for node in handle.iterNodes(where='/'):
@@ -199,7 +199,7 @@ def loadh(file, name=Ellipsis, deferred=True):
         if own_fid:
             handle.close()
         return result
-        
+
     return DeferredTable(handle, own_fid)
 
 
@@ -209,40 +209,40 @@ class DeferredTable(object):
         self._node_names = [e.name for e in handle.iterNodes(where='/')]
         self._loaded = {}
         self._own_fid = own_fid
-        
+
         repr_strings = []
         for name in self._node_names:
             repr_strings.append('  %s: [shape=%s, dtype=%s]' % \
                 (name, handle.getNode(where='/', name=name).shape,
                 handle.getNode(where='/', name=name).dtype))
         self._repr_string = '{\n%s\n}' % ',\n'.join(repr_strings)
-    
+
     def __repr__(self):
         return self._repr_string
-        
+
     def __del__(self):
         self.close()
-    
+
     def close(self):
         if self._own_fid:
             self._handle.close()
-        
+
     def __getitem__(self, key):
         if key not in self._node_names:
             raise KeyError('%s not in %s' % (key, self._node_names))
         if key not in self._loaded:
             self._loaded[key] = self._handle.getNode(where='/', name=key)[:]
         return self._loaded[key]
-    
+
     def iteritems(self):
         for name in self._node_names:
             yield (name, getattr(self, name))
-            
+
     def keys(self):
         return self._node_names
-        
+
     def iterkeys(self):
         return iter(self._node_names)
-        
+
     def __contains__(self, key):
         return self._node_names.__contains__(key)

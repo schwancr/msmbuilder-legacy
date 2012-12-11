@@ -10,7 +10,7 @@ def _drift_single_trajectory(metric, trajectory, tau):
     Compute the drift in your desired metric between all pairs of
     conformations in the supplied trajectory which are seperated
     by tau frames.
-    
+
     Parameters
     ----------
     metric : msmbuilder.metrics.AbstractDistanceMetric
@@ -30,7 +30,7 @@ def _drift_single_trajectory(metric, trajectory, tau):
         the supplied trajectory separated by tau[i] frames. The final
         i entries in row i will be padded with -1s to ensure that the
         output 2D arrau is rectangular.
-        
+
     Returns
     -------
     distances : np.ndarray
@@ -41,17 +41,17 @@ def _drift_single_trajectory(metric, trajectory, tau):
     tau = __typecheck_tau(tau)
     #if not isinstance(metric, AbstractDistanceMetric):
     #   raise TypeError('metric must be an instance of AbstractDistanceMetric. you supplied a %s' % metric)
-    
+
     traj_length = trajectory['XYZList'].shape[0]
     ptraj = metric.prepare_trajectory(trajectory)
     distances = -1 * np.ones((len(tau), traj_length - np.min(tau)))
-    
+
     for i in xrange(traj_length - np.min(tau)):
         comp_indices = filter(lambda elem: elem < traj_length, tau + i)
         d = metric.one_to_many(ptraj, ptraj, i, comp_indices)
         # these distances are the ith column
         distances[0:len(comp_indices), i] = d
-        
+
     # if there was only 1 element in tau, reshape output so its 1D
     #if distances.shape == (1, traj_length - np.min(tau)):
     #    distances = np.reshape(distances, traj_length - np.min(tau))
@@ -63,7 +63,7 @@ def drift(metric, trajectories, taus):
         trajectories = [trajectories]
     if isinstance(taus, int):
         taus = [taus]
-        
+
     output = [np.array([])] * len(taus)    
     for trajectory in trajectories:
         d = _drift_single_trajectory(metric, trajectory, taus)
@@ -72,13 +72,14 @@ def drift(metric, trajectories, taus):
             selected_d = np.ma.masked_less(d[i, :], 0)
             selected_d = np.ma.compressed(selected_d)
             output[i] = np.hstack((output[i], selected_d))
-            
+
     return output
+
 
 def square_drift(metric, trajectories, tau):
     output = drift(metric, trajectories, tau)
-    for i,row in enumerate(output):
-        output[i] = row**2
+    for i, row in enumerate(output):
+        output[i] = row ** 2
     return output
 
 
@@ -90,31 +91,32 @@ def get_epsilon_neighborhoods(metric, ptraj, tau):
         if i < tau:
             output.append(metric.one_to_many(ptraj, ptraj,
                 i, [i + tau])[0])
-        elif i >= N-tau:
+        elif i >= N - tau:
             output.append(metric.one_to_many(ptraj, ptraj, i,
                 [i - tau])[0])
         else:
             output.append(metric.one_to_many(ptraj, ptraj, i,
                 [i - tau, i + tau]).max())
-    
+
     return output
+
 
 def hitting_time(metric, trajectory, epsilon):
     """
     For each frame in trajectories, determine the time it takes to go more
     than epsilon distance from where it started.
-    
+
     Returns: a masked array of integers of length equal to the length of
     the trajectory. The masked values correspond to frames for which the
     hitting time could not be determined (maybe the trajectory wasn't long
     enough so it never left the epsilon-ball)
     """
-    
+
     traj_length = len(trajectory)
     ptraj = metric.prepare_trajectory(trajectory)
     window_length = 8
     output = -1 * np.ones(len(trajectory), dtype=np.int)
-    
+
     for i in xrange(traj_length):
         found = False
         mult = 1
@@ -139,31 +141,31 @@ def hitting_time(metric, trajectory, epsilon):
             #print i
             #print forward_window[np.min(where)]
             #print d[np.min(where)]
-    
+
     #return np.ma.masked_equal(output, -1)
     return output
+
 
 def __typecheck_tau(tau):
     """make sure tau is a 1D numpy array of positive ints, 
     or make it into one if possible unambiguously"""
-    
+
     if isinstance(tau, int):
         if tau < 0:
             raise TypeError('Tau cannot be negative')
-        
+
         tau = np.array([tau])
     else:
         tau = np.array(tau)
         if not len(tau.shape) == 1:
             raise TypeError('Tau must be a 1D array or an int. You supplied %s' % tau)
-    
+
     # ensure positive
     if not np.all(tau == np.abs(tau)):
         raise TypeError('Taus must be all positive.')
-    
+
     # ensure ints
     if not np.all(tau == np.array(tau, dtype='int')):
         raise TypeError('Taus must be all integers.')
-    
-    return tau
 
+    return tau

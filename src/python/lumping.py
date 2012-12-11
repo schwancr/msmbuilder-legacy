@@ -17,22 +17,22 @@ tr = np.trace
 
 def normalize_left_eigenvectors(V):
     """Normalize the left eigenvectors
-    
+
     Normalization condition is <v[:,i]/pi, v[:,i]> = 1
-    
+
     Parameters
     ----------
     V : ndarray
         The left eigenvectors, as a two-dimensional array where the kth
         eigenvectors is V[:,k]
-    
+
     Notes
     -----
     Acts inplace. Assumes that V[:,0] is the equilibrium vector and that detailed balance holds.
     """
     pi = V[:, 0]
     pi /= pi.sum()
-    
+
     for k in xrange(1, V.shape[-1]):
         x = V[:, k]
         x /= abs(np.dot(x / pi, x)) ** .5
@@ -50,19 +50,19 @@ def trim_eigenvectors_by_flux(lam, vl, flux_cutoff):
         Left eigenvectors of transition matrix.
     flux_cutoff : float
         Discard eigenvectors with fluxes below this value.
-    
+
     Notes
     -----
     Assuming that the left eigenvectors are properly pi-normalized,
     the equilibrium flux contribution of each eigenvector :math:`v` is given by :math:`\sum_i v_i^2`
-    
+
     Returns
     -------
     lam : ndarray
         Eigenvalues after discarding low-flux eigenvectors.
     vl : ndarray
         Left eigenvectors after discarding low-flux eigenvectors.
-    
+
     """
     normalize_left_eigenvectors(vl)
 
@@ -71,7 +71,7 @@ def trim_eigenvectors_by_flux(lam, vl, flux_cutoff):
     flux_list = np.array([(vl[:, i] ** 2).sum() for i in range(N)])
     flux_list /= flux_list[0]
     flux_list[0] = flux_list.max()
-    
+
     KeepInd = np.where(flux_list >= flux_cutoff)[0]
 
     logger.info("Implied timescales (UNITLESS)")
@@ -83,7 +83,7 @@ def trim_eigenvectors_by_flux(lam, vl, flux_cutoff):
     lam = lam[KeepInd]
     vl = vl[:, KeepInd]
     flux_list = flux_list[KeepInd]
-    
+
     logger.info("After Flux calculation, Implied timescales (UNITLESS):")
     logger.info(-1 / np.log(lam))
 
@@ -95,14 +95,14 @@ def trim_eigenvectors_by_flux(lam, vl, flux_cutoff):
 
 def get_maps(A):
     """Get mappings from the square array A to the flat vector of parameters alpha.
-    
+
     Helper function for PCCA+ optimization.
-    
+
     Parameters
     ----------
     A : ndarray
         The transformation matrix A.
-    
+
     Returns
     -------
     flat_map : ndarray
@@ -130,14 +130,14 @@ def get_maps(A):
 
 def to_flat(A, flat_map):
     """Convert a square matrix A to a flat array alpha.
-    
+
     Parameters
     ----------
     A : ndarray
         The transformation matrix A
     flat_map : ndarray
         Mapping from flat indices (k) to square (i,j) indices.
-    
+
     Returns
     -------
     FlatenedA : ndarray
@@ -148,7 +148,7 @@ def to_flat(A, flat_map):
 
 def to_square(alpha, square_map):
     """Convert a flat array alpha to a square array A.
-    
+
     Parameters
     ----------
     alpha : ndarray
@@ -180,7 +180,7 @@ def pcca_plus(T, N, flux_cutoff=None, do_minimization=True, objective_function="
         In general, minimization is recommended.
     objective_function: {'crisp_metastablility', 'metastability', 'metastability'}
         Possible objective functions.  See objective for details.
-    
+
     Returns
     -------
     A : ndarray
@@ -191,23 +191,23 @@ def pcca_plus(T, N, flux_cutoff=None, do_minimization=True, objective_function="
         The right eigenvectors.
     microstate_mapping : ndarray
         Mapping from microstates to macrostates.
-    
-    
+
+
     Notes
     -----
     PCCA+ is used to construct a "lumped" state decomposition.  First,
     The eigenvalues and eigenvectors are computed for a transition matrix.
     An optimization problem is then used to estimate a mapping from
     microstates to macrostates.
-    
+
     For each microstate i, microstate_mapping[i] is chosen as the
     macrostate with the largest membership (chi) value.
-    
+
     The membership matrix chi is given by chi = dot(vr,A).
-    
+
     Finally, the transformation matrix A is the output of a constrained
     optimization problem.
-    
+
 
     References
     ----------
@@ -218,12 +218,12 @@ def pcca_plus(T, N, flux_cutoff=None, do_minimization=True, objective_function="
     .. [2]  Deuflhard P, Weber, M.,  "Robust perron cluster analysis in
      conformation dynamics,"
     Linear Algebra Appl., vol 398 pp 161-184 2005.
-    
+
     .. [3]  Kube S, Weber M.  "A coarse graining method for the
     identification of transition rates between molecular conformations,"
     J. Chem. Phys., vol 126 pp 24103-024113, 2007.
-    
-    
+
+
     See Also
     --------
     PCCA
@@ -234,7 +234,7 @@ def pcca_plus(T, N, flux_cutoff=None, do_minimization=True, objective_function="
     if flux_cutoff != None:
         lam, vl = trim_eigenvectors_by_flux(lam, vl, flux_cutoff)
         N = len(lam)
-    
+
     pi = vl[:, 0]
 
     vr = vl.copy()
@@ -250,8 +250,8 @@ def pcca_plus(T, N, flux_cutoff=None, do_minimization=True, objective_function="
 
 def opt_soft(vr, N, pi, lam, T, do_minimization=True, objective_function="crisp_metastability"):
     """Perform PCCA+ algorithm by optimizing transformation matrix A.
-    
-  
+
+
     Parameters
     ----------
     vr :  ndarray
@@ -268,7 +268,7 @@ def opt_soft(vr, N, pi, lam, T, do_minimization=True, objective_function="crisp_
         Set to false if skipping minimization step.
     objective_function: {'crisp_metastablility', 'metastability', 'metastability'}
         Possible objective functions.  See objective for details.
-    
+
     Returns
     -------
     A : ndarray
@@ -277,7 +277,7 @@ def opt_soft(vr, N, pi, lam, T, do_minimization=True, objective_function="crisp_
         The membership matrix
     microstate_mapping : ndarray
         Mapping from microstates to macrostates.
-    
+
     """
 
     index = index_search(vr)
@@ -318,7 +318,7 @@ def opt_soft(vr, N, pi, lam, T, do_minimization=True, objective_function="crisp_
 
 def has_constraint_violation(A, vr, epsilon=1E-8):
     """Check for constraint violations in transformation matrix.
-    
+
     Parameters
     ----------
     A : ndarray
@@ -327,30 +327,29 @@ def has_constraint_violation(A, vr, epsilon=1E-8):
         The right eigenvectors.
     epsilon : float, optional
         Tolerance of constraint violation.
-        
+
     Returns
     -------
     truth : bool
         Whether or not the violation exists
-    
-    
+
+
     Notes
     -------
     Checks constraints using Eqn 4.25 in [1].
-    
-    
+
+
     References
     ----------
     .. [1]  Deuflhard P, Weber, M.,  "Robust perron cluster analysis in
      conformation dynamics,"
     Linear Algebra Appl., vol 398 pp 161-184 2005.
-    
     """
 
     lhs = 1 - A[0, 1:].sum()
     rhs = dot(vr[:, 1:], A[1:, 0])
     rhs = -1 * rhs.min()
-    
+
     if abs(lhs - rhs) > epsilon:
         return True
     else:
@@ -374,14 +373,14 @@ def objective(alpha, vr, square_map, lam, T, pi, barrier_penalty=20000., objecti
         Equilibrium Populations of transition matrix.
     objective_function: {'crisp_metastablility', 'metastability', 'metastability'}
         Possible objective functions.
-        
-        
+
+
     Returns
     -------
     obj : float
         The objective function
-    
-    
+
+
     Notes
     -------
     crispness: try to make crisp state decompostion.  This function is
@@ -394,21 +393,21 @@ def objective(alpha, vr, square_map, lam, T, pi, barrier_penalty=20000., objecti
     This is the recommended choice.  This is the metastability (trace)
     of a transition matrix computed by forcing a crisp (non-fuzzy)
     microstate mapping.  Defined in ref. [2].
-    
+
     References
     ----------
     .. [1]  Deuflhard P, Weber, M.,  "Robust perron cluster analysis in
      conformation dynamics,"
     Linear Algebra Appl., vol 398 pp 161-184 2005.
-    
+
     .. [2]  Kube S, Weber M.  "A coarse graining method for the
     identification of transition rates between molecular conformations,"
     J. Chem. Phys., vol 126 pp 24103-024113, 2007.
-    
+
     .. [3]  Kube S.,  "Statistical Error Estimation and Grid-free
     Hierarchical Refinement in Conformation Dynamics," Doctoral Thesis.
     2008
-        
+
     """
 
     n, N = vr.shape
@@ -422,10 +421,10 @@ def objective(alpha, vr, square_map, lam, T, pi, barrier_penalty=20000., objecti
     mapping = np.argmax(chi_fuzzy, 1)
 
     possible_objective_functions = ["crispness", "crisp_metastability", "metastability"]
-    
+
     if objective_function not in possible_objective_functions:
         raise Exception("objective_function must be one of ", possible_objective_functions)
-    
+
     if objective_function == "crisp_metastability":
         chi = 0.0 * chi_fuzzy
         chi[np.arange(n), mapping] = 1.
@@ -437,7 +436,7 @@ def objective(alpha, vr, square_map, lam, T, pi, barrier_penalty=20000., objecti
         meta = 0.
         for i in range(N):
             meta += dot(T.dot(chi[:, i]), pi * chi[:, i]) / dot(chi[:, i], pi)
-        
+
         obj = meta
 
     if objective_function == "crispness":
@@ -455,31 +454,31 @@ def objective(alpha, vr, square_map, lam, T, pi, barrier_penalty=20000., objecti
         obj -= barrier_penalty
 
     logger.info("f = %f", obj.real)
-    
+
     return obj
 
 
 def fill_A(A, vr):
     """Construct feasible initial guess for transformation matrix A.
-    
-  
+
+
     Parameters
     ----------
     A : ndarray
         Possibly non-feasible transformation matrix.
     vr :  ndarray
         Right eigenvectors of transition matrix
-    
+
     Returns
     -------
     A : ndarray
         Feasible transformation matrix.
-    
+
     """
     n, N = vr.shape
-    
+
     A = A.copy()
-    
+
     #compute 1st column of A by row sum condition
     A[1:, 0] = -1 * A[1:, 1:].sum(1)
 
@@ -494,24 +493,24 @@ def fill_A(A, vr):
 
 def index_search(vr):
     """Find simplex structure in eigenvectors to begin PCCA+.
-    
-  
+
+
     Parameters
     ----------
     vr :  ndarray
         Right eigenvectors of transition matrix
-    
+
     Returns
     -------
     index : ndarray
         Indices of simplex
-    
+
     """
 
     n, N = vr.shape
 
     index = np.zeros(N, 'int')
-    
+
     # first vertex: row with largest norm
     index[0] = np.argmax([norm(vr[i]) for i in range(n)])
 
@@ -533,7 +532,7 @@ def index_search(vr):
 
 def PCCA(T, num_macro, tolerance=1E-5, flux_cutoff=None):
     """Create a lumped model using the PCCA algorithm.
-    
+
     1.  Iterate over the eigenvectors, starting with the slowest.
     2.  Calculate the spread of that eigenvector within each existing macrostate.
     3.  Pick the macrostate with the largest eigenvector spread.
@@ -575,7 +574,7 @@ def PCCA(T, num_macro, tolerance=1E-5, flux_cutoff=None):
     if flux_cutoff is not None:
         lam, vl = trim_eigenvectors_by_flux(lam, vl, flux_cutoff)
         num_macro = len(lam)
-    
+
     pi = vl[:, 0]
 
     vr = vl.copy()
@@ -598,7 +597,7 @@ def PCCA(T, num_macro, tolerance=1E-5, flux_cutoff=None):
     3.  Pick the macrostate with the largest eigenvector spread.
     4.  Split the macrostate based on the sign of the eigenvector.
     """
-    
+
     for i in range(num_macro - 1):  # Thus, if we want 2 states, we split once.
         v = vr[:, i]
         AllSpreads = np.array([spread(v[microstate_mapping == k]) for k in range(i + 1)])

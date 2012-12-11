@@ -213,7 +213,6 @@ def deterministic_subsample(trajectories, stride, start=0):
         return concatenate_trajectories(strided)
 
 
-
 def empty_trajectory_like(traj):
     """Get a trajectory with the right metadata, but no xyz coordinates
 
@@ -258,7 +257,7 @@ def p_norm(data, p=2):
     else:
         p = float(p)
         n = float(data.shape[0])
-        return ((data**p).sum()/n)**(1.0/p)
+        return ((data ** p).sum() / n) ** (1.0 / p)
 
 
 #####################################################################
@@ -348,7 +347,6 @@ def _kcenters(metric, ptraj, k=None, distance_cutoff=None, seed=0, verbose=True)
     ----------
     .. [1] Beauchamp, MSMBuilder2
     """
-
 
     if k is None and distance_cutoff is None:
         raise ValueError("I need some cutoff criterion! both k and distance_cutoff can't both be none")
@@ -461,7 +459,6 @@ def _clarans(metric, ptraj, k, num_local_minima, max_neighbors, local_swap=True,
     if not k == len(initial_medoids):
         raise ValueError('Initial medoids not the same length as k')
 
-
     initial_pmedoids = ptraj[initial_medoids]
     initial_cost = np.sum(initial_distance)
     min_cost = initial_cost
@@ -542,7 +539,6 @@ def _clarans(metric, ptraj, k, num_local_minima, max_neighbors, local_swap=True,
             optimal_medoids = medoids.copy()
             optimal_assignments = assignments.copy()
             optimal_distances = distance_to_current.copy()
-
 
     return optimal_medoids, optimal_assignments, optimal_distances
 
@@ -736,7 +732,6 @@ class Hierarchical(object):
         elif isinstance(trajectories, types.GeneratorType):
             trajectories = list(trajectories)
 
-
         self.traj_lengths = np.array([len(traj['XYZList']) for traj in trajectories])
         #self.ptrajs = [self.metric.prepare_trajectory(traj) for traj in self.trajectories]
 
@@ -828,7 +823,7 @@ class Hierarchical(object):
         Exception if something already exists at `filename`
         """
         io.saveh(filename, z_matrix=self.Z, traj_lengths=self.traj_lengths)
-    
+
     @classmethod
     def load_from_disk(cls, filename):
         """Load up a clusterer from disk
@@ -848,10 +843,9 @@ class Hierarchical(object):
         data = io.loadh(filename, deferred=False)
         Z, traj_lengths = data['z_matrix'], data['traj_lengths']
         #Next two lines are a hack to fix Serializer bug. KAB
-        if np.rank(traj_lengths)==0:
+        if np.rank(traj_lengths) == 0:
             traj_lengths = [traj_lengths]
         return cls(None, None, precomputed_values=(Z, traj_lengths))
-
 
 
 class BaseFlatClusterer(object):
@@ -931,7 +925,7 @@ class BaseFlatClusterer(object):
         # put twoD into a rectangular array
         output = -1 * np.ones((len(self._traj_lengths), max(self._traj_lengths)), dtype=np.int32)
         for i, traj_assign in enumerate(twoD):
-            output[i,0:len(traj_assign)] = ptraj_index_to_gens_traj_index[traj_assign]
+            output[i, 0:len(traj_assign)] = ptraj_index_to_gens_traj_index[traj_assign]
 
         return output
 
@@ -1109,7 +1103,6 @@ class SubsampledClarans(BaseFlatClusterer):
         else:
             raise ValueError('Unrecognized parallelization')
 
-
         # function that returns a list of random indices
         gen_sub_indices = lambda: np.array(random.sample(range(self.num_frames), self.num_frames / shrink_multiple))
         #gen_sub_indices = lambda: np.arange(self.num_frames)
@@ -1119,7 +1112,7 @@ class SubsampledClarans(BaseFlatClusterer):
 
         clarans_args = uneven_zip(metric, ptrajs, k, num_local_minima, max_neighbors, local_swap, ['kcenters'], None, None, False)
 
-        results =  mymap(_clarans_helper, clarans_args)
+        results = mymap(_clarans_helper, clarans_args)
         medoids_list, assignments_list, distances_list = zip(*results)
         best_i = np.argmin([np.sum(d) for d in distances_list])
 
@@ -1128,7 +1121,6 @@ class SubsampledClarans(BaseFlatClusterer):
         #print 'sub indices', sub_indices[best_i]
         #print 'best_medoids', sub_indices[best_i][medoids_list[best_i]]
         self._generator_indices = sub_indices[best_i][medoids_list[best_i]]
-
 
 
 class HybridKMedoids(BaseFlatClusterer):
@@ -1171,7 +1163,6 @@ class HybridKMedoids(BaseFlatClusterer):
         """
 
         super(HybridKMedoids, self).__init__(metric, trajectories)
-
 
         medoids, assignments, distances = _hybrid_kmedoids(metric, self.ptraj, k, distance_cutoff,
                                                            local_num_iters, True, norm_exponent,

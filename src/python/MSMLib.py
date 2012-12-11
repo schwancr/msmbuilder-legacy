@@ -87,7 +87,7 @@ def estimate_rate_matrix(count_matrix, assignments):
     # Most Likely Estimator ( Kij(hat) = Nij / Ri )
     # Where K is the rate matrix, N is the Transition count matrix and Ri is
     # the number of assignments to state i
-    
+
     if scipy.sparse.isspmatrix(count_matrix):
         count_matrix_copy = scipy.sparse.csr_matrix(count_matrix).asfptype()
         D = scipy.sparse.dia_matrix((1.0 / num_assigns, 0), 
@@ -153,7 +153,7 @@ def estimate_transition_matrix(count_matrix):
 def build_msm(counts, symmetrize='MLE', ergodic_trimming=True):
     """
     Estimates the transition probability matrix from the counts matrix.
-    
+
     Parameters
     ----------
     counts : matrix
@@ -162,7 +162,7 @@ def build_msm(counts, symmetrize='MLE', ergodic_trimming=True):
         symmetrization scheme so that we have reversible counts
     ergodic_trim : bool (optional)
         whether or not to trim states to achieve an ergodic model
-        
+
     Returns
     -------
     rev_counts : matrix
@@ -175,7 +175,7 @@ def build_msm(counts, symmetrize='MLE', ergodic_trimming=True):
         a mapping from the passed counts matrix to the new counts and transition
         matrices
     """
-    
+
     symmetrize = str(symmetrize).lower()
     symmetrization_error = ValueError("Invalid symmetrization scheme requested: %s. Exiting." % symmetrize)
     if symmetrize not in ['mle', 'transpose', 'none']:
@@ -342,7 +342,7 @@ def apply_mapping_to_assignments(assignments, mapping):
     NewMapping[np.where(mapping == -1)] = mapping.max() + 1
 
     NegativeOneStates = np.where(assignments == -1)
-    
+
     assignments[:] = NewMapping[assignments]
     WhereEliminatedStates = np.where(assignments == (mapping.max() + 1))
 
@@ -378,7 +378,7 @@ def invert_assignments(assignments):
     # convert from lists to numpy arrays
     for key, (trajs, frames) in inverse_mapping.iteritems():
         inverse_mapping[key] = (np.array(trajs), np.array(frames))
-    
+
     return inverse_mapping
 
 
@@ -601,28 +601,28 @@ def ergodic_trim(counts, assignments=None):
         apply_mapping_to_assignments(assignments, Mapping)
 
     return (X, Mapping)
-    
-    
+
+
 def ergodic_trim_indices(counts):
     """
     Finds the indices of the largest strongly connected subgraph implied by
     the transitions in `counts`.
-    
+
     Parameters
     ----------
     counts : matrix
         The MSM counts matrix
-        
+
     Returns
     -------
     states_to_trim : ndarray, int
         A list of the state indices that should be trimmed to obtain the 
-    
+
     See Also
     --------
     trim_states : func
     """
-    
+
     ConnectedComponents = tarjan(counts)
     PiSym = np.array(counts.sum(0)).flatten()
     ComponentPops = np.array([sum(PiSym[np.array(x)]) for x in ConnectedComponents])
@@ -631,15 +631,15 @@ def ergodic_trim_indices(counts):
     logger.info("Selected component %d with population %f", ComponentInd, ComponentPops[ComponentInd] / ComponentPops.sum())
 
     states_to_trim = np.unique(ConnectedComponents[ComponentInd])
-    
+
     return states_to_trim
-    
-    
+
+
 def trim_states(states_to_trim, counts, assignments=None):
     """
     Performs the necessary operations to reduce an MSM to a subset of the
     orignial states -- effectively trimming those states out.
-    
+
     Parameters
     ----------
     states_to_trim : ndarray, int OR list of ints
@@ -648,7 +648,7 @@ def trim_states(states_to_trim, counts, assignments=None):
         A counts matrix
     assignments : ndarray, int (optional)
         An assignments array
-    
+
     Returns
     -------
     trimmed_counts : matrix
@@ -657,9 +657,9 @@ def trim_states(states_to_trim, counts, assignments=None):
         The assignements, with values for "trimmed" states set to "-1", which
         is read as an empty value by MSMBuilder
     """
-    
+
     NZ = np.array(counts.nonzero()).transpose()
-    
+
     mapping = np.zeros(counts.shape[0], dtype='int') - 1
     for i, x in enumerate(states_to_trim):
         mapping[x] = i
@@ -677,7 +677,7 @@ def trim_states(states_to_trim, counts, assignments=None):
         return trimmed_counts, trimmed_assignments
     else:
         return trimmed_counts
-    
+
 
 def log_likelihood(count_matrix, transition_matrix):
     """log of the likelihood of an observed count matrix given a transition matrix
@@ -922,43 +922,43 @@ def mle_reversible_count_matrix(count_matrix, prior=0.0, initial_guess=None):
 def permute_mat(A, permutation):
     """
     Permutes the indices of a transition probability matrix.
-    
+
     This functions simply switches the lables of `A` rows and
     columns from [0, 1, 2, ...] to `permutation`.
-    
+
     Parameters
     ----------
     tprob : matrix
-    
+
     permutation: ndarray, int
         The permutation array, a list of unique indices that 
-    
+
     Returns
     -------
     permuted_A : matrix
         The permuted matrix
     """
-    
+
     if scipy.sparse.issparse(A):
         sparse = True
     else:
         sparse = False
-    
+
     if sparse:
-        
+
         pi = scipy.sparse.lil_matrix(A.shape)
         for i in range(A.shape[0]):
             pi[i, permutation[i]] = 1.0  # send i -> correct place
         permuted_A = pi * A * pi.T
-        
+
     else:
-        
+
         pi = np.zeros(A.shape)
         for i in range(A.shape[0]):
             pi[i, permutation[i]] = 1.0  # send i -> correct place
         #permuted_A = np.dot( Pi, np.dot( A, pi.T ) )
         permuted_A = pi.dot(A.dot(pi.T))
-    
+
     return permuted_A
 
 
