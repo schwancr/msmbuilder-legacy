@@ -12,6 +12,7 @@ before_install:
   - sudo apt-get install -qq python-numpy python-scipy python-matplotlib
   - sudo apt-get install -qq swig
   - pip install ./
+  - export OMP_NUM_THREADS = 1
 install:
   - python setup.py install
 script:
