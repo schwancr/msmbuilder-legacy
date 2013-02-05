@@ -19,7 +19,7 @@
 
 import sys
 import os
-import numpy
+import numpy as np
 
 from msmbuilder import MSMLib
 from msmbuilder import io
@@ -50,7 +50,7 @@ def run(min_lag_time, max_lag_time, interval, num_eigen, assignments_list,
     logger.info("Getting %d eigenvalues (timescales) for each lagtime...", 
                 num_eigen)
 
-    lag_tmes = range(min_lag_time, max_lag_time+1, interval)
+    lag_times = range(min_lag_time, max_lag_time+1, interval)
     logger.info("Building MSMs at the following lag times: %s", lag_times)
 
     # Get the implied timescales (eigenvalues)
@@ -58,7 +58,7 @@ def run(min_lag_time, max_lag_time, interval, num_eigen, assignments_list,
         num_implied_times=num_eigen, sliding_window=True, symmetrize=symmetrize,
         num_procs=num_procs)
 
-    numpy.savetxt(output, imp_times)
+    np.savetxt(output, imp_times)
 
     return
 

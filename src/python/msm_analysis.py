@@ -25,6 +25,7 @@ import multiprocessing
 import warnings
 from msmbuilder import io
 from msmbuilder.utils import uneven_zip
+import MSMLib
 import logging
 logger = logging.getLogger(__name__)
 
