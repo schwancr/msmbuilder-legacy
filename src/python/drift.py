@@ -3,9 +3,11 @@ Compute the drift in trajectories under different distance metrics
 using new distance_metrics.py code
 """
 import numpy as np
+from msmbuilder import Trajectory
 
 
-def _drift_single_trajectory(metric, trajectory, tau):
+def _drift_single_trajectory(metric, tau, trajectory=None, 
+                             prepared_trajectory=None):
     """
     Compute the drift in your desired metric between all pairs of
     conformations in the supplied trajectory which are seperated
@@ -15,8 +17,6 @@ def _drift_single_trajectory(metric, trajectory, tau):
     ----------
     metric : msmbuilder.metrics.AbstractDistanceMetric
         The distance metric to compute distances with
-    trajectory : msmbuilder.Trajectory
-        The trajectory to compute the distances
     tau : {int, np.ndarray}
         tau can be either a positive integer or an array of positive
         integers. If tau is an integer, the return value is a 1D array
@@ -30,6 +30,10 @@ def _drift_single_trajectory(metric, trajectory, tau):
         the supplied trajectory separated by tau[i] frames. The final
         i entries in row i will be padded with -1s to ensure that the
         output 2D arrau is rectangular.
+    trajectory : msmbuilder.Trajectory or None
+        The trajectory to compute the distances
+    prepared_trajectory : np.ndarray or None
+        The prepared trajectory to use in computing distances
         
     Returns
     -------
@@ -39,16 +43,22 @@ def _drift_single_trajectory(metric, trajectory, tau):
     """
     # make sure tau is a 1D numpy array of positive ints, or make it into one
     tau = __typecheck_tau(tau)
-    #if not isinstance(metric, AbstractDistanceMetric):
-    #   raise TypeError('metric must be an instance of AbstractDistanceMetric. you supplied a %s' % metric)
+
+    if not prepared_trajectory is None:
+        pass
+    elif not trajectory is None:
+        prepared_trajectory = metric.prepare_trajectory(trajectory)
+    else:
+        raise Exception("One of prepared_trajectory and trajectory must "
+                        "not be None!")
     
-    traj_length = trajectory['XYZList'].shape[0]
-    ptraj = metric.prepare_trajectory(trajectory)
+    traj_length = prepared_trajectory.shape[0]
     distances = -1 * np.ones((len(tau), traj_length - np.min(tau)))
     
     for i in xrange(traj_length - np.min(tau)):
         comp_indices = filter(lambda elem: elem < traj_length, tau + i)
-        d = metric.one_to_many(ptraj, ptraj, i, comp_indices)
+        d = metric.one_to_many(prepared_trajectory, prepared_trajectory,
+                               i, comp_indices)
         # these distances are the ith column
         distances[0:len(comp_indices), i] = d
         
@@ -58,15 +68,36 @@ def _drift_single_trajectory(metric, trajectory, tau):
     return distances
 
 
-def drift(metric, trajectories, taus):
-    if 'XYZList' in trajectories:
-        trajectories = [trajectories]
+def drift(metric, taus, trajectories=None, prepared_trajectories=None):
+
+    if not prepared_trajectories is None:
+        # Need to check the shape of this to be sure it isn't just a
+        # single prepared trajectory
+        if isinstance(prepared_trajectories, np.ndarray):
+            if len(prepared_trajectories.shape) == 3:
+                prepared_trajectories = list(prepared_trajectories)
+            elif len(prepared_trajectories.shape) == 2:
+                prepared_trajectories = [prepared_trajectories]
+            else:
+                raise Exception("prepared_trajectories should be a list"
+                                " of prepared trajectories")
+        trajectories = [None] * len(prepared_trajectories)
+    elif not trajectories is None:
+        if isinstance(trajectories, Trajectory):
+            trajectories = [trajectories]
+        prepared_trajectories = [None] * len(trajectories)
+    else:
+        raise Exception("Must provide one of prepared_trajectories and "
+                        "trajectories")
+
     if isinstance(taus, int):
         taus = [taus]
         
     output = [np.array([])] * len(taus)    
-    for trajectory in trajectories:
-        d = _drift_single_trajectory(metric, trajectory, taus)
+    for trajectory, prepared_trajectory in zip(trajectories, 
+                                               prepared_trajectories):
+        d = _drift_single_trajectory(metric, taus, trajectory=trajectory
+                                     prepared_trajectory=prepared_trajectory)
         for i in range(len(taus)):
             #length_i = d.shape[1] - (taus[i] - np.min(taus))
             selected_d = np.ma.masked_less(d[i, :], 0)
