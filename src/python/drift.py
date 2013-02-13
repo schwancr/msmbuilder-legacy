@@ -93,16 +93,18 @@ def drift(metric, taus, trajectories=None, prepared_trajectories=None):
     if isinstance(taus, int):
         taus = [taus]
         
-    output = [np.array([])] * len(taus)    
+    #output = [np.array([])] * len(taus)    
+    output = []
     for trajectory, prepared_trajectory in zip(trajectories, 
                                                prepared_trajectories):
-        d = _drift_single_trajectory(metric, taus, trajectory=trajectory
+        d = _drift_single_trajectory(metric, taus, trajectory=trajectory,
                                      prepared_trajectory=prepared_trajectory)
-        for i in range(len(taus)):
-            #length_i = d.shape[1] - (taus[i] - np.min(taus))
-            selected_d = np.ma.masked_less(d[i, :], 0)
-            selected_d = np.ma.compressed(selected_d)
-            output[i] = np.hstack((output[i], selected_d))
+    #    for i in range(len(taus)):
+    #        #length_i = d.shape[1] - (taus[i] - np.min(taus))
+    #        selected_d = np.ma.masked_less(d[i, :], 0)
+    #        selected_d = np.ma.compressed(selected_d)
+    #        output[i] = np.hstack((output[i], selected_d))
+        output.append(d)
             
     return output
 
