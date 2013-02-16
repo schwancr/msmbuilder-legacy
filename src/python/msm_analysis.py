@@ -242,8 +242,7 @@ def get_implied_timescales_helper(args):
         symmetrize) = args
     logger.info("Calculating implied timescales at lagtime %d" % lag_time)
 
-    num_states = np.unique(np.concatenate([ass[np.where(ass!=-1)] 
-        for ass in assignments_list ])).shape[0]
+    num_states = np.max([ass.max() for ass in assignments_list]) + 1
 
     counts = MSMLib.get_count_matrix_from_assignments(assignments_list[0], 
         n_states=num_states, lag_time=lag_time, sliding_window=sliding_window)
