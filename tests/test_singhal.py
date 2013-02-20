@@ -18,8 +18,11 @@ class test_SinghalError():
         s = SinghalError(c, force_dense=True)
 
         variances = s.get_eigenvalue_variances(which_eigenvalues=range(1,10))
+        qi_list = s.get_eigenvalue_variances(which_eigenvalues=range(1,10), return_list=True)
 
         ref_vars = get('singhal_reference/reference_variances.dat')
+        ref_qis = get('singhal_reference/reference_qis.dat')
 
         eq(ref_vars, variances)
+        eq(ref_qis, qi_list)
 

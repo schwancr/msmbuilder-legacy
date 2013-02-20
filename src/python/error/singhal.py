@@ -82,8 +82,8 @@ class SinghalError(MSMError):
             self.issparse = False
             self.tProb = self.tProb.toarray()
             self.counts = self.coutns.toarray()
-            
             # most scipy methods prefer csr
+
 
     def get_eigenvalue_variances(self, which_eigenvalues=None, 
                                  eigenvalues=None, return_list=False):
