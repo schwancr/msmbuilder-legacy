@@ -101,7 +101,7 @@ if os.environ.get('READTHEDOCS', None) == 'True' and __name__ == '__main__':
     
     metadata['name'] = 'msmbuilder'
     metadata['packages'] = ['msmbuilder', 'msmbuilder.scripts', 'msmbuilder.project',
-                            'msmbuilder.geometry', 'msmbuilder.metrics']
+                            'msmbuilder.geometry', 'msmbuilder.metrics', 'msmbuilder.error']
     metadata['scripts'] = [e for e in glob('scripts/*.py') if not e.endswith('__.py')]
 
     # dirty, dirty trick to install "mock" packages
@@ -158,6 +158,9 @@ def configuration(parent_package='',top_path=None):
     config.add_subpackage('project',
                           subpackage_path='src/python/project')
 
+
+    config.add_subpackage('error',
+                          subpackage_path='src/python/error')
     # add asa extension
     # note this is wrapped using f2py, which
 	# is a little different that the other modules,
