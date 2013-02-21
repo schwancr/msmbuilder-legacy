@@ -88,7 +88,7 @@ class SinghalError(MSMError):
             logger.warning("Dense is the only thing that works :(")
             self.issparse = False
             self.tProb = self.tProb.toarray()
-            self.counts = self.coutns.toarray()
+            self.counts = self.counts.toarray()
             # most scipy methods prefer csr
         
         self.store_results = store_results
@@ -207,21 +207,26 @@ class SinghalError(MSMError):
             # eigenvalue with respect to all entries in self.tProb
             # this is the s^\lambda matrix in [1]
 
-            qis = []
+            #qis = []
             # qis stores the contribution to the variance for each state i
             # see note above about qi_lists
-            for i in xrange(num_states):
-                middle_mat = np.eye(num_states) * self.tProb[i] - \
-                                 np.outer(self.tProb[i], self.tProb[i])
+            #for i in xrange(num_states):
+            #    middle_mat = np.eye(num_states) * self.tProb[i] - \
+            #                     np.outer(self.tProb[i], self.tProb[i])
                 # middle_mat corresponds to the middle term in equation (25)
                 # in [1]:
                 # q_i = s_i^T [diag(p_i) - p_i p_i^T] s_i
                 # q_i = s_i^T [middle_mat] s_i
                 # where s_i is the i'th row of dLambda_dT
 
-                qis.append(dLambda_dT[i].dot(middle_mat).dot(dLambda_dT[i]))
+            #    qis.append(dLambda_dT[i].dot(middle_mat).dot(dLambda_dT[i]))
                 # qi is the contribution of state i to this eigenvalue's 
                 # variance
+
+            ST = dLambda_dT * self.tProb
+            # the above matrix appears to be symmetric... not sure why
+            qis = (dLambda_dT * ST).sum(axis=1) - \
+                    np.square((ST).sum(axis=1))
             
             if self.store_results:
                 self.qi_lists[eigenvalue_ind] = np.array(qis)
