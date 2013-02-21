@@ -154,15 +154,17 @@ class SinghalError(MSMError):
         num_states = self.tProb.shape[0]
         for eigenvalue in eigenvalues:
 
+            print "Starting analysis for eigenvalue=%f" % eigenvalue
             dLambda_dT = self.__get_eigenvalue_derivatives__(eigenvalue)
             # dLambda_dT is a matrix corresponding to the derivative of the
             # eigenvalue with respect to all entries in self.tProb
             # this is the s^\lambda matrix in [1]
-
+            print "Calculated derivatives"
             qis = []
             # qis stores the contribution to the variance for each state i
             # see note above about qi_lists
             for i in xrange(num_states):
+                print "Computing contribution from state %d" % i
                 middle_mat = np.eye(num_states) * self.tProb[i] - \
                                  np.outer(self.tProb[i], self.tProb[i])
                 # middle_mat corresponds to the middle term in equation (25)
@@ -178,6 +180,7 @@ class SinghalError(MSMError):
             qi_lists.append(np.array(qis))
 
         qi_lists = np.array(qi_lists)
+        print "All Done!"
 
         if return_list:
             return qi_lists
@@ -236,6 +239,7 @@ class SinghalError(MSMError):
             U = L_trans.T
             # scipy puts the unit diagonal in the L matrix, but Singhal specify
             # that U has unit diagonal entries
+        print "Factorized the matrix."
 
         # CRS: I am fairly confident I am doing this wrong...
         zero_diagonal_index = np.where(np.abs(L.diagonal()) <= ZERO_THRESHOLD)
@@ -266,6 +270,7 @@ class SinghalError(MSMError):
             U, S, VH = scipy.linalg.svd(L.T) 
             zero_ind = np.where(S <= ZERO_THRESHOLD)
             x_a = VH[zero_ind].flatten()
+        print "Solved both linear equations."
         #    print zero_ind, zero_diagonal_index
             # pretty sure these should be the same...
             #x_a = scipy.linalg.solve(L.T, zero_col)
