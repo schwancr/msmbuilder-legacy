@@ -22,7 +22,8 @@ class SinghalError(MSMError):
     as well as the eigenvector entries for a given MSM.
     """
 
-    def __init__(self, counts, tProb=None, force_dense=False, prior=0.0):
+    def __init__(self, counts, tProb=None, force_dense=False, prior=0.0, 
+                 store_results=True):
         """
         Initialize the object:
         
@@ -39,6 +40,12 @@ class SinghalError(MSMError):
             prior to add to the counts matrix. This can either be an
             array corresponding to a different prior for each state (this
             doesn't really make sense...) or a number to add to all states
+        store_results : bool, optional
+            store results when calculating errors. This can be useful if
+            you ask for the variance of a particular eigenvalue several times
+            or wish to calculate the error of an eigenvector, which requires
+            some results from the eigenvalue analysis. If you know what you are
+            doing, it is more memory efficient to pass False. (default=True)
             
         Notes
         -----
@@ -83,7 +90,23 @@ class SinghalError(MSMError):
             self.tProb = self.tProb.toarray()
             self.counts = self.coutns.toarray()
             # most scipy methods prefer csr
-
+        
+        self.store_results = store_results
+        if self.store_results:
+            # make containers to store intermediate results
+            # each container is a dict whose keys correspond to the 
+            # eigensolution's index and value corresponds to the result
+            self.x_vecs = {}  # solution to U x = e_K where U is from A = LU
+            self.x_a_vecs = {}  # non-trivial vector in null(L^T)
+            self.qi_lists = {}  # contribution to the eigenvalue variances
+                                # per state
+            self.eigenvalues = {}  # eigenvalues 
+            
+            self.stored_dicts = [self.x_vecs, self.x_a_vecs, self.qi_lists, 
+                                 self.eigenvalues]
+            # keep track of all of the values we are storing to make sure that
+            # they all have values for each eigensolution
+            self.which_solutions = []
 
     def get_eigenvalue_variances(self, which_eigenvalues=None, 
                                  eigenvalues=None, return_list=False):
@@ -92,12 +115,16 @@ class SinghalError(MSMError):
         
         Parameters
         ----------
-        which_eigenvalues : list or int, optional
+        which_eigenvalues : array_like or int, optional
             calculate the variance in one or more eigenvalues. If None, then
             calculate variances for all eigenvalues.
         return_list : bool, optional
             if True, then the list of contributions to the variance for each
             state is returned. Otherwise the total variance is returned
+        eigenvalues : array_like, optional
+            if you have already calculated the eigenvalues, you can pass them
+            here so we don't calculate them again. There should be one for each
+            of the entries in which_eigenvalues. 
         
         Returns
         -------
@@ -111,6 +138,7 @@ class SinghalError(MSMError):
             by the number of counts. To get the variance you must do this:
             
             >>> sing_err = SinghalError(...)
+            >>> qi_lists = sing_err.get_eigenvalue_variances(...)
             >>> variance[i] = np.sum(qi_lists[i] / (sing_err.weights + 1))
 
             sing_err.weights corresponds to the number of counts in that state
@@ -125,7 +153,9 @@ class SinghalError(MSMError):
 
         if eigenvalues is None:
             if which_eigenvalues is None:
-                raise Exception("Must provide one of eigenvalues or which_eigenvalues")
+                logger.warn("No eigenvalues specified, so we will calculate"
+                            " errors for ALL of them. this could be bad...")
+                which_eigenvalues = np.arange(self.tProb.shape[0])
             else:
                 if isinstance(which_eigenvalues, (list, np.ndarray)):
                     which_eigenvalues = np.array(which_eigenvalues).astype(int)
@@ -144,6 +174,11 @@ class SinghalError(MSMError):
                 eigenvalues = np.array([eigenvalues])
             else:
                 raise Exception("Unrecognized type for eigenvalues")
+            if which_eigenvalues is None and self.store_results:
+                logger.warn("In order to store the results well, we need to"
+                            " know which eigenvalues these correspond to..."
+                            " to be safe, we will not store ANY results.")
+                self.store_results = False
 
         qi_lists = [] 
         # qi_lists holds the contribution to each eigenvalue's variance per 
@@ -152,9 +187,22 @@ class SinghalError(MSMError):
         # NOTE: these are not normalized yet... so:
         # var_of_eval_i = np.sum(qi_lists[i] / (self.weights + 1))
         num_states = self.tProb.shape[0]
-        for eigenvalue in eigenvalues:
+        for eigenvalue_ind, eigenvalue in zip(which_eigenvalues, eigenvalues):
 
-            dLambda_dT = self.__get_eigenvalue_derivatives__(eigenvalue)
+            if self.store_results:
+                # check if this eigenvalue was already calculated
+                if eigenvalue_ind in self.which_solutions:
+                    if np.abs(eigenvalue - self.eigenvalues[eigenvalue_ind]) < ZERO_THRESHOLD:
+                        qi_lists.append(self.qi_lists[eigenvalue_ind])
+                        continue
+                    else:
+                        # eigenvalue doesn't match so be safe and re-calculate
+                        pass
+                else:
+                    self.eigenvalues[eigenvalue_ind] = eigenvalue
+        
+            dLambda_dT = self.__get_eigenvalue_derivatives__(eigenvalue_ind, 
+                                                             eigenvalue)
             # dLambda_dT is a matrix corresponding to the derivative of the
             # eigenvalue with respect to all entries in self.tProb
             # this is the s^\lambda matrix in [1]
@@ -175,9 +223,14 @@ class SinghalError(MSMError):
                 # qi is the contribution of state i to this eigenvalue's 
                 # variance
             
+            if self.store_results:
+                self.qi_lists[eigenvalue_ind] = np.array(qis)
+
             qi_lists.append(np.array(qis))
 
         qi_lists = np.array(qi_lists)
+
+        self.__update_stored_values__()
 
         if return_list:
             return qi_lists
@@ -205,20 +258,156 @@ class SinghalError(MSMError):
             to be a corresponding eigenvalue in eigenvalues
 
         Notes
-        Not Implemented. Sorry.
         """
+        if eigenvalues is None:
+            if which_eigenvalues is None:
+                logger.warn("No eigenvalues specified, so we will calculate"
+                            " errors for ALL of them. this could be bad...")
+                which_eigenvalues = np.arange(self.tProb.shape[0])
+            else:
+                if isinstance(which_eigenvalues, (list, np.ndarray)):
+                    which_eigenvalues = np.array(which_eigenvalues).astype(int)
+                    which_eigenvalues = which_eigenvalues.flatten()
+                elif isinstance(which_eigenvalues, (int, float)):
+                    which_eigenvalues = np.array([int(which_eigenvalues)])
+                else:   
+                    raise Exception("Unrecognized type for which_eigenvalues")
+                eigenvalues = msm_analysis.get_eigenvectors(self.tProb, 
+                    np.max(which_eigenvalues) + 1)[0]
+                eigenvalues = eigenvalues[which_eigenvalues]
+        else:           
+            if isinstance(eigenvalues, (list, np.ndarray)):
+                eigenvalues = np.array(eigenvalues).flatten()
+            elif isinstance(eigenvalues, float):
+                eigenvalues = np.array([eigenvalues])
+            else:
+                raise Exception("Unrecognized type for eigenvalues")
+            if which_eigenvalues is None and self.store_results:
+                logger.warn("In order to store the results well, we need to"
+                            " know which eigenvalues these correspond to..."
+                            " to be safe, we will not store ANY results.")
+                self.store_results = False
         
-        raise Exception("Not Implemented.")
+        
+    def __get_eigenvector_derivatives__(self, eigenvalue_ind, eigenvalue,
+                                        eigenvector):
+        """
+        Internal function for calculating the dereivative of the eigenvector
+        with respect to each element in the transition probability matrix.
+        """
 
+        num_states = self.tProb.shape[0]
+        if self.issparse:
+            Abar = self.tProb - scipy.sparse.eye(num_states, num_states) * eigenvalue
+        else:
+            Abar = self.tProb - np.eye(num_states) * eigenvalue
 
-    def __get_eigenvalue_derivatives__(self, eigenvalue):
+        # There are two equations to solve, and then some matrix/vector 
+        # arithmetic. The first equation is B8 in [1]:
+        #  _        _        _     _
+        # |   Abar   |      | -e_i  |
+        # |          | c_i =|       |
+        # |_ evec^T _|      |_  0  _|
+        # let's call the matrix on the left "Ahat" and the vector on the 
+        # right "rhs_vec"
+        # basically, add another row to Abar corresponding to the 
+        # eigenvector of interest, then solve the equation Ahat x = rhs
+        # where rhs is a vector of zeros, except the i'th entry is -1
+        # NOTE: Singhal-Hinrichs suggests to "augment the LU decomposition
+        # of Abar to solve this equation efficiently, so this could be a 
+        # place to improve performance. For now we just want to get it 
+        # working
+        if self.issparse:
+            row_inds, col_inds = Abar.nonzero()
+            data = Abar.data()
+            # get the nonzero entries in Abar
+
+            row_inds = np.concatenate([row_inds, [num_states]*num_states])
+            col_inds = np.concatenate([col_inds, np.arange(num_states)])
+            data = np.concatenate(data, eigenvector)
+            # add the eigenvector to the final row of Ahat
+
+            ij = np.array(zip(row_inds, col_inds))
+            Ahat = scipy.sparse.csr_matrix((data, ij))
+        else:
+            Ahat = np.concatenate((Abar, eigenvector.reshape((1,-1))))
+
+        ci_list = []
+        for i in xrange(num_states):   
+            rhs = np.zeros(num_states + 1).astype(float)
+            rhs[i] = - 1.0
+            if self.issparse:
+                ci_list.append(scipy.sparse.linalg.spsolve(Ahat, rhs))
+            else:
+                ci_list.append(scipy.linalg.lstsq(Ahat, rhs)[0])
+        ci_list = np.array(ci_list)
+
+        # The second equation we need to solve is also given in B8 of [1]:
+        # 
+        #  _        _       _    _
+        # |   Abar   |     | evec |
+        # |          | d = |      |
+        # |_ evec^T _|     |_  0 _|
+        # so the left matrix is the same, and the rhs is the eigenvector
+        # with a zero concatenated on the end.
+
+        rhs = np.concatenate([eigenvector, [0]])
+        if self.issparse:
+            d = scipy.sparse.linalg.spsolve(Ahat, rhs)
+        else:
+            d = scipy.linalg.lstsq(Ahat, rhs)[0]
+
+        x = None
+        x_a = None
+        if self.store_results:
+            if eigenvalue_ind in self.which_solutions:
+                x = self.x_vecs[eigenvalue_ind]
+                x_a = self.x_a_vecs[eigenvalue_ind]
+
+        if (x is None) or (x_a is None):
+            # need to calculate these quantities
+            dLambda_dT = self.__get_eigenvalue_derivatives__(eigenvalue_ind,
+                                                             eigenvalue)
+        else: # maybe I should be storing dLambda_dT rather than the x's?
+            dLambda_dT = np.outer(x, x_a) / np.dot(x, x_a)
+
+        # Now we must find the derivatives using eq. B9 from [1]:
+        #
+        # [dVec_dT_ij] = c_i / v_j + 1 / dLambda_dT d
+        # 
+        # we will calculate this by calculating each term seperately
+        # it is important to realize that result (dVec_dT) is a THREE
+        # dimensional array, sich that [dVec_dT]_nij is the deriviative
+        # of the n'th entry in the eigenvector with respect to T_ij
+        
+        inv_dLambda_dT = 1. / dLambda_dT
+        inv_eigenvector = 1. / eigenvector
+        # zeros?!!?!
+
+        term_two = np.empty((num_states,)*3)
+        term_two[:] = inv_dLambda_dT
+        #term_two = np.vstack([inv_dLambda_dT]*num_states)
+        d = d.reshape((num_states, 1, 1))
+        print term_two.shape, d.shape
+        term_two *= d
+        
+        dVec_dT = np.empty((num_states,)*3)
+        for i in xrange(num_states):
+            dVec_dT[i] = np.outer(ci_list[:,i], inv_eigenvector)
+
+        dVec_dT += term_two
+
+        return dVec_dT
+        
+
+    def __get_eigenvalue_derivatives__(self, eigenvalue_ind, eigenvalue):
         """
         Internal function for doing the calculating necessary for calculating
         errors using the Singhal method.
         
         You should use get_eigenvalue_variances
         """
-    
+
         num_states = self.tProb.shape[0]
 
         # Abar is (T - \lambda I) where T is the transition matrix
@@ -285,10 +474,35 @@ class SinghalError(MSMError):
         if scipy.sparse.issparse(x):
             x = x.asarray()
 
-        #print x_a.shape, x.shape
+        if self.store_results:
+            self.x_vecs[eigenvalue_ind] = x
+            self.x_a_vecs[eigenvalue_ind] = x_a
+
         dlambda_dT = np.outer(x_a, x) / np.dot(x_a, x)
         # dlambda_dT is the matrix of derivatives of the particular eigenvalue
         # with respect to the elements of the transition matrix
 
         return dlambda_dT
         
+    
+    def __update_stored_values__(self):
+        """
+        Internal function for keeping track of the eigensolutions we've already
+        analyzed
+        """
+        if not self.store_results:
+            return
+
+        self.which_solutions = np.unique(np.concatenate(
+            [d.keys() for d in self.stored_dicts]))
+        
+        for d in self.stored_dicts:
+            self.which_solutions = np.intersect1d(self.which_solutions, 
+                                                  d.keys())
+
+        for d in self.stored_dicts:
+            for key in d.keys():
+                if not key in self.which_solutions:
+                    d.pop(key)
+            
+        return
