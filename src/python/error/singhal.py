@@ -6,6 +6,7 @@ from msmbuilder import MSMLib
 import scipy.sparse
 import logging
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 ZERO_THRESHOLD = 1E-8
 
@@ -189,7 +190,7 @@ class SinghalError(MSMError):
         num_states = self.tProb.shape[0]
         for eigenvalue_ind, eigenvalue in zip(which_eigenvalues, eigenvalues):
 
-            print "Starting calculation for eigenvalue %d" % eigenvalue_ind
+            logger.debug( "Starting calculation for eigenvalue %d" % eigenvalue_ind)
             if self.store_results:
                 # check if this eigenvalue was already calculated
                 if eigenvalue_ind in self.which_solutions:
@@ -235,7 +236,7 @@ class SinghalError(MSMError):
             qi_lists.append(qis)
 
         qi_lists = np.array(qi_lists)
-        print "All Done!"
+        logger.debug( "All Done!")
 
         self.__update_stored_values__()
 
@@ -395,7 +396,7 @@ class SinghalError(MSMError):
         term_two[:] = inv_dLambda_dT
         #term_two = np.vstack([inv_dLambda_dT]*num_states)
         d = d.reshape((num_states, 1, 1))
-        print term_two.shape, d.shape
+        logger.debug(str(term_two.shape) + " " + str(d.shape))
         term_two *= d
         
         dVec_dT = np.empty((num_states,)*3)
@@ -432,7 +433,7 @@ class SinghalError(MSMError):
             U = L_trans.T
             # scipy puts the unit diagonal in the L matrix, but Singhal specify
             # that U has unit diagonal entries
-        print "Factorized the matrix."
+        logger.debug( "Factorized the matrix.")
 
         # CRS: I am fairly confident I am doing this wrong...
         zero_diagonal_index = np.where(np.abs(L.diagonal()) <= ZERO_THRESHOLD)
@@ -455,15 +456,17 @@ class SinghalError(MSMError):
 
         if self.issparse:
             x = scipy.linalg.sparse.spsolve(U, e_K)
+            logger.debug("Solved eqn 1")
             x_a = scipy.linalg.sparse.spsolve(L.T, zero_col)
         else:
             x = scipy.linalg.solve(U, e_K)
             # equation 2 is the null spce of L^T, so we will solve this
             # with SVD:
+            logger.debug("Solved eqn 1")
             U, S, VH = scipy.linalg.svd(L.T) 
             zero_ind = np.where(S <= ZERO_THRESHOLD)
             x_a = VH[zero_ind].flatten()
-        print "Solved both linear equations."
+        logger.debug("Solved both linear equations.")
         #    print zero_ind, zero_diagonal_index
             # pretty sure these should be the same...
             #x_a = scipy.linalg.solve(L.T, zero_col)
