@@ -247,7 +247,7 @@ def get_implied_timescales_helper(args):
     counts = MSMLib.get_count_matrix_from_assignments(assignments_list[0], 
         n_states=num_states, lag_time=lag_time, sliding_window=sliding_window)
 
-    for i in xrange(len(assignments_list)):
+    for i in xrange(1, len(assignments_list)):
         counts = counts + MSMLib.get_count_matrix_from_assignments(
             assignments_list[i], n_states=num_states, lag_time=lag_time, 
             sliding_window=sliding_window)
