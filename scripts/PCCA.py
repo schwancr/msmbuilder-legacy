@@ -30,28 +30,32 @@ logger = logging.getLogger('msmbuilder.scripts.PCCA')
 
 float_or_none = lambda s: None if s.lower() == 'none' else float(s)
 
-def run_pcca(num_macrostates, assignments, tProb):
+def run_pcca(num_macrostates, assignments_list, tProb):
     logger.info("Running PCCA...")
-    if len(np.unique(assignments[np.where(assignments != -1)])) != tProb.shape[0]:
-        raise ValueError('Different number of states in assignments and tProb!')
+    for assignments in assignments_list:
+        if len(np.unique(assignments[np.where(assignments != -1)])) != tProb.shape[0]:
+            raise ValueError('Different number of states in assignments and tProb!')
+
     MAP = lumping.PCCA(tProb, num_macrostates)
 
     # MAP the new assignments and save, make sure don't
     # mess up negaitve one's (ie where don't have data)
-    MSMLib.apply_mapping_to_assignments(assignments, MAP)
+    for i in xrange(len(assignments_list)):
+        MSMLib.apply_mapping_to_assignments(assignments_list[i], MAP)
 
-    return MAP, assignments
+    return MAP, assignments_list
     
-def run_pcca_plus(num_macrostates, assignments, tProb, flux_cutoff=0.0,
+def run_pcca_plus(num_macrostates, assignments_list, tProb, flux_cutoff=0.0,
     objective_function="crispness",do_minimization=True):
     
     logger.info("Running PCCA+...")
     A, chi, vr, MAP = lumping.pcca_plus(tProb, num_macrostates, flux_cutoff=flux_cutoff,
         do_minimization=do_minimization, objective_function=objective_function)
 
-    MSMLib.apply_mapping_to_assignments(assignments, MAP)    
+    for i in xrange(len(assignments_list)):
+        MSMLib.apply_mapping_to_assignments(assignments_list[i], MAP)
 
-    return chi, A, MAP, assignments
+    return chi, A, MAP, assignments_list
 
 if __name__ == "__main__":
     parser = arglib.ArgumentParser(description="""
@@ -61,7 +65,7 @@ dynamics of the microstate model for lumping into kinetically relevant
 macrostates.
 
 Output: MacroAssignments.h5, a new assignments HDF file, for the Macro MSM.""")
-    parser.add_argument('assignments', default='Data/Assignments.Fixed.h5')
+    parser.add_argument('assignments', default=['Data/Assignments.Fixed.h5'], nargs='+')
     parser.add_argument('num_macrostates', type=int)
     parser.add_argument('tProb')
     parser.add_argument('output_dir')
@@ -76,10 +80,14 @@ Output: MacroAssignments.h5, a new assignments HDF file, for the Macro MSM.""")
     args = parser.parse_args()
 
     # load args
-    try:
-        assignments = msmbuilder.io.loadh(args.assignments, 'arr_0')
-    except KeyError:
-        assignments = msmbuilder.io.loadh(args.assignments, 'Data')
+    assignments_list = []
+    for i in xrange(len(args.assignments):
+        try:
+            ass = msmbuilder.io.loadh(args.assignments[i], 'arr_0')
+        except KeyError:
+            ass = msmbuilder.io.loadh(args.assignments[i], 'Data')
+
+        assignments_list.append(ass)
 
     tProb = scipy.io.mmread(args.tProb)
     
@@ -89,32 +97,39 @@ Output: MacroAssignments.h5, a new assignments HDF file, for the Macro MSM.""")
         args.do_minimization = True
     
     if args.algorithm == 'PCCA':
-        MacroAssignmentsFn = os.path.join(args.output_dir, "MacroAssignments.h5")
+        MacroAssignmentsFn_list = [os.path.join(args.output_dir, "MacroAssignments.%d.h5" % i) for i in xrange(len(assignments_list))]
         MacroMapFn = os.path.join(args.output_dir, "MacroMapping.dat")
-        arglib.die_if_path_exists([MacroAssignmentsFn, MacroMapFn])
+        arglib.die_if_path_exists(MacroAssignmentsFn_list + [MacroMapFn])
         
-        MAP, assignments = run_pcca(args.num_macrostates, assignments, tProb)
+        MAP, assignments_list = run_pcca(args.num_macrostates, assignments_list, tProb)
 
         np.savetxt(MacroMapFn, MAP, "%d")
-        msmbuilder.io.saveh(MacroAssignmentsFn, assignments)
-        logger.info("Saved output to: %s, %s", MacroAssignmentsFn, MacroMapFn)
+        logger.info("Saved output to: %s", MacroMapFn)
+        for i in xrange(len(assignments_list)):
+            msmbuilder.io.saveh(MacroAssignmentsFn_list[i], assignments_list[i])
+
+            logger.info("Saved output to: %s", MacroAssignmentsFn_list[i])
+
         
     elif args.algorithm == 'PCCA+':
-        MacroAssignmentsFn = os.path.join(args.output_dir, "MacroAssignments.h5")
+        MacroAssignmentsFn_list = [os.path.join(args.output_dir, "MacroAssignments.%d.h5" % i) for i in xrange(len(assignments_list))]
         MacroMapFn = os.path.join(args.output_dir, "MacroMapping.dat")
         ChiFn = os.path.join(args.output_dir, 'Chi.dat')
         AFn = os.path.join(args.output_dir, 'A.dat')
         
-        arglib.die_if_path_exists([MacroAssignmentsFn, MacroMapFn, ChiFn, AFn])
+        arglib.die_if_path_exists(MacroAssignmentsFn_list + [MacroMapFn, ChiFn, AFn])
         
-        chi, A, MAP, assignments = run_pcca_plus(args.num_macrostates,
-            assignments, tProb, args.flux_cutoff, objective_function=args.objective_function,
+        chi, A, MAP, assignments_list = run_pcca_plus(args.num_macrostates,
+            assignments_list, tProb, args.flux_cutoff, objective_function=args.objective_function,
             do_minimization=args.do_minimization)
                       
         np.savetxt(ChiFn, chi)
         np.savetxt(AFn, A)
         np.savetxt(MacroMapFn, MAP,"%d")
-        msmbuilder.io.saveh(MacroAssignmentsFn, assignments)
-        logger.info('Saved output to: %s, %s, %s, %s', ChiFn, AFn, MacroMapFn, MacroAssignmentsFn)
+        logger.info('Saved output to: %s, %s, %s', ChiFn, AFn, MacroMapFn)
+        for i in xrange(len(assignments_list)):
+            msmbuilder.io.saveh(MacroAssignmentsFn_list[i], assignments_list[i])
+            logger.info('Saved output to: %s', MacroAssignmentsFn_list[i])
+
     else:
         raise Exception()
