@@ -25,7 +25,6 @@ import multiprocessing
 import warnings
 from msmbuilder import io
 from msmbuilder.utils import uneven_zip
-import MSMLib
 import logging
 logger = logging.getLogger(__name__)
 
@@ -244,6 +243,7 @@ def get_implied_timescales_helper(args):
 
     num_states = np.max([ass.max() for ass in assignments_list]) + 1
 
+    from msmbuilder import MSMLib
     counts = MSMLib.get_count_matrix_from_assignments(assignments_list[0], 
         n_states=num_states, lag_time=lag_time, sliding_window=sliding_window)
 
