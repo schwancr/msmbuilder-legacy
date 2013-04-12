@@ -10,13 +10,14 @@ logger = logging.getLogger('msmbuilder.scripts.SaveStructures')
 DEBUG = True
 
 
-def run(project, assignments, states, n_per_state, random=None, replacement=True):
+def run(project, assignments_list, states, n_per_state, random=None, replacement=True):
     """Extract random conformations from states
 
     Parameters
     ----------
     project : msmbuilder.project
-    assignments : np.ndarray, shape=[n_trajs, n_confs], dtype=int
+    assignments_list : list
+        list of assignments. Each assignments array should be an np.ndarray
     states : array_like
         The indices of the states to pull from
     n_per_state : int
@@ -35,10 +36,26 @@ def run(project, assignments, states, n_per_state, random=None, replacement=True
         random = np.random
 
     results = []
+    ind_inv_list = []
     # get a mapping from microstate -> trj/frame
-    inv = MSMLib.invert_assignments(assignments)
+
+    n_traj_list = [ a.shape[0] for a in assignments_list ]
+
+    for assignments in assignments_list:
+        ind_inv = MSMLib.invert_assignments(assignments)
+        ind_inv_list.append(ind_inv)
+
+    uniq_states = np.unique(np.concatenate([d.keys() for d in ind_inv_list]))
+
     for s in states:
-        trajs, frames = inv[s]
+        trajs, frames = ind_inv_list[0][s]
+        for i in xrange(1, len(ind_inv_list)):
+            temp_trajs, temp_frames = ind_inv_list[i][s]
+            temp_trajs += np.sum(n_traj_list[:i])
+        
+            trajs = np.concatenate((trajs, temp_trajs))
+            frames = np.concatenate((frames, temp_frames))
+    
         if len(trajs) != len(frames):
             raise RuntimeError('inverse assignments corrupted?')
 
@@ -103,7 +120,7 @@ The conformations can either be saved in separate files (i.e. one PDB file per
 conformations), or in the same file.
 """)
     parser.add_argument('project')
-    parser.add_argument('assignments', default='Data/Assignments.Fixed.h5')
+    parser.add_argument('assignments', default=['Data/Assignments.Fixed.h5'], nargs='+')
     parser.add_argument('conformations_per_state', default=5, type=int,
         help='Number of conformations to sample from each state')
     parser.add_argument('states', nargs='+', type=int,
@@ -141,14 +158,19 @@ conformations), or in the same file.
     project = Project.load_from(args.project)
 
     # assignments
-    try:
-        assignments = io.loadh(args.assignments, 'arr_0')
-    except KeyError:
-        assignments = io.loadh(args.assignments, 'Data')
+    assignments_list = []
+    for fn in args.assignments:
+        try:
+            assignments = io.loadh(fn, 'arr_0')
+        except KeyError:
+            assignments = io.loadh(fn, 'Data')
+        assignments_list.append(assignments)
 
     # states
     if -1 in args.states:
-        n_states = len(np.unique(assignments[np.where(assignments != -1)]))
+        n_states = len(np.unique(np.concatenate(
+            [assignments[np.where(assignments != -1)] 
+            for assignments in assignments_list])))
         logger.info('Yanking from all %d states', n_states)
         states = np.arange(n_states)
     else:
@@ -159,7 +181,7 @@ conformations), or in the same file.
 
 
     # extract the conformations using np.random for the randomness
-    confs_by_state = run(project=project, assignments=assignments,
+    confs_by_state = run(project=project, assignments_list=assignments_list,
         states=states, n_per_state=args.conformations_per_state,
         random=np.random, replacement=args.replacement)
 
