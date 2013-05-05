@@ -38,7 +38,8 @@ class CovarianceMatrix(object):
     C' = (C + C^T) / 2
      
     """
-    def __init__(self, lag, procs=1, calc_cov_mat=True, size=None):
+    def __init__(self, lag, procs=1, calc_cov_mat=True, size=None, tProb=None,
+                 populations=None):
         """
         Create an empty CovarianceMatrix object.
 
@@ -61,7 +62,14 @@ class CovarianceMatrix(object):
             trained vector will be used to initialize it.
         
         """
-        
+
+        self.tProb = tProb
+        self.populations = populations
+        if self.tProb is None:
+            self.populations = None
+        else:
+            self.tProb = self.tProb.tolil()
+
         self.corrs = None
         self.sum_t = None
         self.sum_t_dt = None
@@ -74,6 +82,8 @@ class CovarianceMatrix(object):
         self.sum_all = None
 
         self.trained_frames = 0
+        self.trained_frames_t = 0
+        self.trained_frames_dt = 0
         self.total_frames = 0
         # Track how many frames we've trained
 
@@ -114,12 +124,17 @@ class CovarianceMatrix(object):
         if self.calc_cov_mat:
             self.corrs_lag0 = np.zeros((N, N), dtype=float)
 
-    def train(self, data_vector):
+    def train(self, data_vector, assignments=None):
         a=time()  # For debugging we are tracking the time each step takes
 
+        if not self.populations is None:
+            if assignments is None:
+                raise Exception("Need to input assignments array for this trajectory")
+    
         if self.size is None:  
         # then we haven't started yet, so set up the containers
             self.set_size(data_vector.shape[1])
+
 
         if data_vector.shape[1] != self.size:
             raise Exception("Input vector is not the right size. axis=1 should "
@@ -132,22 +147,43 @@ class CovarianceMatrix(object):
             return
 
         b=time()
+        if not self.populations is None:
+            good_ass_ind = np.where((assignments[:-self.lag] != -1) & (assignments[self.lag:] != -1))[0]
+            # need to account for trimmed states. We will do this by having them be probability zero.
+
+            pops_t = np.zeros((len(data_vector) - self.lag, 1))
+            pops_dt = np.zeros((len(data_vector) - self.lag, 1))
+            trans_t_dt = np.zeros((len(data_vector) - self.lag, 1))
+            pops_all = np.zeros((len(data_vector), 1))
+
+            pops_t[good_ass_ind] = self.populations[assignments[good_ass_ind]].reshape((-1,1))
+            pops_dt[good_ass_ind] = self.populations[assignments[good_ass_ind + self.lag]].reshape((-1,1))
+            trans_t_dt[good_ass_ind] = self.tProb[assignments[good_ass_ind], assignments[good_ass_ind + self.lag]].toarray().reshape((-1,1))
+            pops_all[np.where(assignments != -1)] = self.populations[assignments[np.where(assignments != -1)]].reshape((-1,1))
+        else:
+            pops_t = np.ones((len(data_vector[:-self.lag]), 1))
+            pops_dt = pops_t
+            trans_t_dt = pops_t
+            pops_all = np.ones((len(data_vector), 1))
 
         if self.lag != 0:
-            self.corrs += data_vector[:-self.lag].T.dot(data_vector[self.lag:])
-            self.sum_t += data_vector[:-self.lag].sum(axis=0)
-            self.sum_t_dt += data_vector[self.lag:].sum(axis=0)
+            self.corrs += (pops_t * trans_t_dt * data_vector[:-self.lag]).T.dot(data_vector[self.lag:])
+            self.sum_t += np.sum(data_vector[:-self.lag] * pops_t, axis=0)
+            self.sum_t_dt += np.sum(data_vector[self.lag:] * pops_dt, axis=0)
         else:
-            self.corrs += data_vector.T.dot(data_vector)
-            self.sum_t += data_vector.sum(axis=0)
-            self.sum_t_dt += self.sum_t
+            self.corrs += (data_vector * pops_all).T.dot(data_vector) 
+            self.sum_t += np.sum(data_vector * pops_all, axis=0)
+            self.sum_t_dt += np.sum(data_vector * pops_all, axis=0)
 
         if self.calc_cov_mat:
-            self.corrs_lag0 += data_vector.T.dot(data_vector)
-            self.sum_all += data_vector.sum(axis=0)
-            self.total_frames += data_vector.shape[0]
+            self.corrs_lag0 += (pops_all * data_vector).T.dot(data_vector)
+            self.sum_all += np.sum(data_vector * pops_all, axis=0)
 
-        self.trained_frames += data_vector.shape[0] - self.lag  
+            self.total_frames += pops_all.sum()
+
+        self.trained_frames += (pops_t * trans_t_dt).sum()
+        self.trained_frames_t += pops_t.sum()
+        self.trained_frames_dt += pops_dt.sum()
         # this accounts for us having finite trajectories, so we really are 
         #  only calculating expectation values over N - \Delta t total samples
 
@@ -167,7 +203,7 @@ class CovarianceMatrix(object):
         
         time_lag_corr = (self.corrs) / float(self.trained_frames)
 
-        outer_expectations = np.outer(self.sum_t, self.sum_t_dt) / float(self.trained_frames) ** 2
+        outer_expectations = np.outer(self.sum_t, self.sum_t_dt) / float(self.trained_frames_t) / float(self.trained_frames_dt)
 
         current_estimate = time_lag_corr - outer_expectations
         #current_estimate += current_estimate.T  # symmetrize the matrix
