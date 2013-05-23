@@ -81,7 +81,7 @@ Output: MacroAssignments.h5, a new assignments HDF file, for the Macro MSM.""")
 
     # load args
     assignments_list = []
-    for i in xrange(len(args.assignments):
+    for i in xrange(len(args.assignments)):
         try:
             ass = msmbuilder.io.loadh(args.assignments[i], 'arr_0')
         except KeyError:
