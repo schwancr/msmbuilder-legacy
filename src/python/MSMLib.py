@@ -31,6 +31,7 @@ MSMLib functions generally relate to one of the following
 
 """
 import warnings
+import copy
 import scipy.sparse
 import scipy.linalg
 import scipy
@@ -137,7 +138,7 @@ def estimate_transition_matrix(count_matrix):
     return tProb
 
 
-def build_msm(counts, symmetrize='MLE', ergodic_trimming=True):
+def build_msm(counts, symmetrize='MLE', ergodic_trimming=True, ergodic_num=1):
     """
     Estimates the transition probability matrix from the counts matrix.
 
@@ -149,6 +150,9 @@ def build_msm(counts, symmetrize='MLE', ergodic_trimming=True):
         symmetrization scheme so that we have reversible counts
     ergodic_trim : bool (optional)
         whether or not to trim states to achieve an ergodic model
+    ergodic_num : int
+        number of transitions required to define whether two nodes 
+        are connected
 
     Returns
     -------
@@ -169,7 +173,14 @@ def build_msm(counts, symmetrize='MLE', ergodic_trimming=True):
         raise symmetrization_error
 
     if ergodic_trimming:
-        counts, mapping = ergodic_trim(counts)
+        graph = copy.deepcopy(counts).tocsr()
+        graph.data[np.where(graph.data < ergodic_num)] = 0
+        graph.data[np.where(graph.data > 0)] = 1
+        graph.eliminate_zeros()
+
+        conn_graph, mapping = ergodic_trim(graph)
+    
+        counts = trim_states(np.where(mapping == -1)[0], counts)
     else:
         mapping = np.arange(counts.shape[0])
 

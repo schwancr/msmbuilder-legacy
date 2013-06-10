@@ -27,7 +27,7 @@ logger = logging.getLogger('msmbuilder.scripts.CalculateImpliedTimescales')
 
 
 def run(MinLagtime, MaxLagtime, Interval, NumEigen, AssignmentsFn, trimming,
-        symmetrize, nProc):
+        symmetrize, nProc, ergodic_num):
 
     logger.info("Getting %d eigenvalues (timescales) for each lagtime...", NumEigen)
     lagTimes = range(MinLagtime, MaxLagtime + 1, Interval)
@@ -36,7 +36,7 @@ def run(MinLagtime, MaxLagtime, Interval, NumEigen, AssignmentsFn, trimming,
     # Get the implied timescales (eigenvalues)
     impTimes = msm_analysis.get_implied_timescales(AssignmentsFn, lagTimes,
         n_implied_times=NumEigen, sliding_window=True, trimming=trimming,
-        symmetrize=symmetrize, n_procs=nProc)
+        symmetrize=symmetrize, n_procs=nProc, ergodic_num=ergodic_num)
 
     return impTimes
 
@@ -68,6 +68,9 @@ contains all the lag times.\n""")
     parser.add_argument('trim', help="""Whether or not to apply an ergodic trim.
         If true, keeps only the largest observed ergodic subset of the data, if
         false, keeps everything. Default: True.""", default=True, type=bool)
+    parser.add_argument('ergodic_num', help="""To determine whether two points
+        are 'connected' in the ergodic trimming step, we use a threshold of at 
+        least n transitions, where n is set with this flag.""", default=1, type=int)
     args = parser.parse_args()
     arglib.die_if_path_exists(args.output)
 
@@ -80,6 +83,6 @@ contains all the lag times.\n""")
         args.symmetrize = None
 
     impTimes = run(MinLagtime, MaxLagtime, args.interval, args.eigvals, args.assignments,
-        args.trim, args.symmetrize, args.procs)
+        args.trim, args.symmetrize, args.procs, args.ergodic_num)
     np.savetxt(args.output, impTimes)
     logger.info("Saved output to %s", args.output)

@@ -17,6 +17,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 import sys
+import copy
 import scipy.sparse
 import scipy.linalg
 import scipy
@@ -142,7 +143,8 @@ def get_eigenvectors(t_matrix, n_eigs, epsilon=.001, dense_cutoff=50, right=Fals
     return e_lambda, e_vectors
 
 
-def get_implied_timescales(assignments_fn, lag_times, n_implied_times=100, sliding_window=True, trimming=True, symmetrize=None, n_procs=1):
+def get_implied_timescales(assignments_fn, lag_times, n_implied_times=100, 
+        sliding_window=True, trimming=True, symmetrize=None, n_procs=1, ergodic_num=1):
     """Calculate implied timescales in parallel using multiprocessing library.  Does not work in interactive mode.
 
     Parameters
@@ -161,6 +163,9 @@ def get_implied_timescales(assignments_fn, lag_times, n_implied_times=100, slidi
         Symmetrization method
     nProc : int
         number of processes to use in parallel (multiprocessing
+    ergodic_num : int
+        number of transitions needed to say two nodes are connected for
+        tarjan algorithm
 
     Returns
     -------
@@ -180,7 +185,7 @@ def get_implied_timescales(assignments_fn, lag_times, n_implied_times=100, slidi
     # subtle bug possibility; uneven_zip will let strings be iterable, whicj
     # we dont want
     inputs = uneven_zip([assignments_fn], lag_times, n_implied_times,
-        sliding_window, trimming, [symmetrize])
+        sliding_window, trimming, [symmetrize], [ergodic_num])
     result = pool.map_async(get_implied_timescales_helper, inputs)
     lags = result.get(999999)
 
@@ -232,7 +237,7 @@ def get_implied_timescales_helper(args):
     MSMLib.build_msm
     get_eigenvectors
     """
-    assignments_fn, lag_time, n_implied_times, sliding_window, trimming, symmetrize = args
+    assignments_fn, lag_time, n_implied_times, sliding_window, trimming, symmetrize, ergodic_num = args
     logger.info("Calculating implied timescales at lagtime %d" % lag_time)
 
     try:
@@ -245,7 +250,7 @@ def get_implied_timescales_helper(args):
 
         counts = MSMLib.get_count_matrix_from_assignments(assignments, lag_time=lag_time,
                                                           sliding_window=sliding_window)
-        rev_counts, t_matrix, populations, mapping = MSMLib.build_msm(counts, symmetrize, trimming)
+        rev_counts, t_matrix, populations, mapping = MSMLib.build_msm(counts, symmetrize, trimming, ergodic_num)
 
     except ValueError as e:
         logger.critical(e)
