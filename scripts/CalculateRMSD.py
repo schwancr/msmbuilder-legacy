@@ -22,7 +22,7 @@ from msmbuilder import Trajectory
 from msmbuilder.metrics import RMSD
 from msmbuilder import arglib
 import logging
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('msmbuilder.scripts.CalculateRMSD')
 
 def run(pdb, traj, atom_indices):
 
@@ -61,7 +61,7 @@ Please use CalculateProjectDistance.py
 
     pdb = Trajectory.load_trajectory_file( args.pdb )
     atom_indices = np.loadtxt( args.atom_indices ).astype(int)
-    traj = Trajectory.load_trajectory_file( args.input )
+    traj = Trajectory.load_trajectory_file(args.input, Conf=pdb)
 
     distances = run(pdb, traj, atom_indices)
     np.savetxt(args.output, distances)

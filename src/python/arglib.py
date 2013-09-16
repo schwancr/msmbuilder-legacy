@@ -7,8 +7,7 @@ from msmbuilder.kernels import parsers as kernel_parsers
 from pprint import pprint
 import warnings
 import logging
-logger = logging.getLogger('arglib')
-
+logger = logging.getLogger(__name__)
 
 def _iter_both_cases(string):
     """Iterate over the chars in a strings in both cases

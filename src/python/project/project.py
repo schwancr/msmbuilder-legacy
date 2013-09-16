@@ -19,12 +19,21 @@
 import os
 import numpy as np
 import yaml
+# if CLoader/CDumper are available (i.e. user has libyaml installed)
+#  then use them since they are much faster.
+try:
+    from yaml import CLoader as Loader
+    from yaml import CDumper as Dumper
+except ImportError:
+    from yaml import Loader
+    from yaml import Dumper
+
 from msmbuilder import Trajectory
 from msmbuilder import io
+from msmbuilder import MSMLib
 import logging
 from msmbuilder.utils import keynat
-logger = logging.getLogger('project')
-
+logger = logging.getLogger(__name__)
 
 class Project(object):
     @property
@@ -41,8 +50,20 @@ class Project(object):
     def traj_lengths(self):
         """Length of each of the trajectories, in frames"""
         return self._traj_lengths[self._valid_traj_indices]
+        
+    def __eq__(self, other):
+        '''Is this project equal to another'''
+        if not isinstance(other, Project):
+            return False
+        return os.path.basename(self._conf_filename) == os.path.basename(other._conf_filename) and \
+            np.all(self._traj_lengths == other._traj_lengths) and \
+            np.all(np.array([os.path.basename(e) for e in self._traj_paths])
+                == np.array([os.path.basename(e) for e in other._traj_paths])) and \
+            np.all(self._traj_errors == other._traj_errors)
+            # np.all(self._traj_converted_from == other._traj_converted_from)
+                                
 
-    def __init__(self, records, validate=True, project_dir='.'):
+    def __init__(self, records, validate=False, project_dir='.'):
         """Create a project from a  set of records
 
         Parameters
@@ -75,7 +96,7 @@ class Project(object):
         self._conf_filename = records['conf_filename']
         self._traj_lengths = np.array(records['traj_lengths'])
         self._traj_paths = np.array(records['traj_paths'])
-        self._traj_converted_from = np.array(records['traj_converted_from'])
+        self._traj_converted_from = list(records['traj_converted_from'])
         self._traj_errors = np.array(records['traj_errors'])
         self._project_dir = os.path.abspath(project_dir)
 
@@ -129,7 +150,7 @@ class Project(object):
 
         if filename.endswith('.yaml'):
             with open(filename) as f:
-                ondisk = yaml.load(f)
+                ondisk = yaml.load(f, Loader=Loader)
                 records = {'conf_filename': ondisk['conf_filename'],
                            'traj_lengths': [],
                            'traj_paths': [],
@@ -148,7 +169,7 @@ class Project(object):
             records = {'conf_filename': str(ondisk['ConfFilename'][0]),
                        'traj_lengths': ondisk['TrajLengths'],
                        'traj_paths': [],
-                       'traj_converted_from': [None] * n_trajs,
+                       'traj_converted_from': [ [None] ] * n_trajs,
                        'traj_errors': [None] * n_trajs}
 
             for i in xrange(n_trajs):
@@ -160,7 +181,7 @@ class Project(object):
             raise ValueError('Sorry, I can only open files in .yaml'
                              ' or .h5 format: %s' % filename)
 
-        return cls(records, validate=True, project_dir=rootdir)
+        return cls(records, validate=False, project_dir=rootdir)
 
     def save(self, filename_or_file):
         if isinstance(filename_or_file, basestring):
@@ -196,21 +217,187 @@ class Project(object):
             # yaml doesn't like numpy types, so we have to sanitize them
             records['trajs'].append({'id': i,
                                     'path': str(traj_paths[i]),
-                                    'converted_from': self._traj_converted_from[i].tolist(),
+                                    'converted_from': list(self._traj_converted_from[i]),
                                     'length': int(self._traj_lengths[i]),
                                     'errors': self._traj_errors[i]})
 
-        yaml.dump(records, handle)
+        yaml.dump(records, handle, Dumper=Dumper)
 
         if own_fid:
             handle.close()
 
         return filename_or_file
 
-    def load_traj(self, trj_index, atom_indices=None, stride=1):
+
+    def get_random_confs_from_states(self, assignments, states, num_confs, 
+        replacement=True, random=np.random):
+        """
+        Get random conformations from a particular state (or states) in assignments.
+
+        Parameters
+        ----------
+        assignments : np.ndarray
+            2D array storing the assignments for a particular MSM
+        states : int or 1d array_like
+            state index (or indices) to load random conformations from
+        num_confs : int or 1d array_like
+            number of conformations to get from state. The shape should 
+            be the same as the states argument
+        replacement : bool, optional
+            whether to sample with replacement or not (default: True)
+        random : np.random.RandomState, optional
+            use a particular RandomState for generating the random samples.
+            this is only useful if you want to get the same samples, i.e.
+            when debugging something.
+
+        Returns
+        -------
+        random_confs : msmbuilder.Trajectory or list of
+                       msmbuilder.Trajectory objects
+            If states is a list, then the output is a list, otherwise a 
+            single trajectory is returned
+            Trajectory object containing random conformations from the 
+            specified state
+        """
+
+        def randomize(state_counts, size=1, replacement=True, random=np.random):
+            """
+            This is a helper function for selecting random conformations. It will
+            select many samples from a discrete, uniform distribution over:
+            
+            .. math::  \{i\}_{i=1}^{\textnormal{state_counts}}
+
+            If replacement==True, then random.randint will be used, otherwise
+            random.permutation will be used.
+
+            Parameters
+            ----------
+            state_counts : int
+                number of conformations in the state
+            size : int, optional
+                number of samples to draw (size kwarg in np.random.randint)
+                default: 1
+            replacement : bool, optional
+                if True, then we sample with replacement, otherwise we use a 
+                permutation
+            random : np.random.RandomState, optional
+                if you want this to behave deterministically then pass a particular
+                random state, otherwise we will use np.random.
+
+            Returns
+            -------
+            result : np.ndarray
+                1d array with samples from the given distribution
+
+            Raises
+            ------
+            ValueError: if size > state_counts and replacement is False, then
+                it is not possible to sample that many conformations without 
+                replacement
+            """
+            if replacement:
+                result = random.randint(0, state_counts, size=size)
+            else:
+                if size > state_counts:
+                    raise ValueError("Asked for %d conformations from a state "
+                                     "with only %d conformations." % (size, state_counts))
+                else:
+                    result = random.permutation(np.arange(state_counts))[:size]
+
+            return result
+            
+
+        if isinstance(states, int):
+            states = np.array([states])
+        states = np.array(states).flatten()
+
+        # if num_confs is just a number, map it to
+        # each state given in states
+        if isinstance(num_confs, int):
+            num_confs = np.array([num_confs] * len(states)) 
+        num_confs = np.array(num_confs).flatten()
+
+        # if num_confs is length-1, then map that value to each
+        # state in states
+        if len(num_confs) == 1:
+            num_confs = np.array(list(num_confs) * len(states))
+
+        if len(num_confs) != len(states):
+            raise Exception("num_confs must be the same size as num_states")
+
+        inv_assignments = MSMLib.invert_assignments(assignments)
+        state_counts = np.bincount(assignments[np.where(assignments!=-1)])
+
+        random_confs = []
+
+        for n, state in zip(num_confs, states):
+            logger.debug("Working on %s", state)
+            random_conf_inds = randomize(state_counts[state], size=n,
+                                         replacement=replacement, 
+                                         random=random)
+
+            traj_inds, frame_inds = inv_assignments[state]
+            random_confs.append(self.load_frame(traj_inds[random_conf_inds], 
+                                                frame_inds[random_conf_inds]))
+        
+        return random_confs
+        
+
+    def load_traj(self, trj_index, stride=1, atom_indices=None):
         "Load the a trajectory from disk"
         filename = self.traj_filename(trj_index)
-        return Trajectory.load_trajectory_file(filename, Stride=stride, AtomIndices=atom_indices)
+        return Trajectory.load_trajectory_file(filename, Stride=stride, 
+                                               AtomIndices=atom_indices)
+        
+    def load_frame(self, traj_index, frame_index):
+        """Load one or more specified frames.
+
+        Example
+        -------
+        >>> project = Project.load_from('ProjectInfo.yaml')
+        >>> foo = project.load_frame(1,10)
+        >>> bar = Trajectory.read_frame(TrajFilename=project.traj_filename(1),
+            WhichFrame=10)
+        >>> np.all(foo['XYZList'] == bar)
+        True
+
+        Parameters
+        ----------
+        traj_index : int, [int]
+            Index or indices of the trajectories to pull from
+        frame_index : int, [int]
+            Index or indices of the frames to pull from
+
+        Returns
+        -------
+        traj : msmbuilder.Trajectory
+            A trajectory object containing the requested frame(s).
+        """
+
+        if np.isscalar(traj_index) and np.isscalar(frame_index):
+            xyz = Trajectory.read_frame(TrajFilename=self.traj_filename(traj_index),
+                WhichFrame=frame_index)
+            xyzlist = np.array([xyz])
+        else:
+            traj_index = np.array(traj_index)
+            frame_index = np.array(frame_index)
+            if not (traj_index.ndim == 1 and np.all(traj_index.shape == frame_index.shape)):
+                raise ValueError('traj_index and frame_index must be 1D and have the same length')
+
+            xyzlist = []
+            for i,j in zip(traj_index, frame_index):
+                if j >= self.traj_lengths[i]:
+                    raise ValueError('traj %d too short (%d) to contain a frame %d' % (i, self.traj_lengths[i], j))
+                xyz = Trajectory.read_frame(TrajFilename=self.traj_filename(i),
+                    WhichFrame=j)
+                xyzlist.append(xyz)
+            xyzlist = np.array(xyzlist)
+
+        conf = self.load_conf()
+        conf['XYZList'] = xyzlist
+
+        return conf
+>>>>>>> 79b96faf468f48fd047026a6e0aaf983741ea73e
 
     def load_conf(self):
         "Load the PDB associated with this project from disk"

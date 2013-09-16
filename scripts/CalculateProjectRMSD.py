@@ -24,13 +24,13 @@ from msmbuilder import Project
 from msmbuilder import Trajectory
 from msmbuilder import io
 from msmbuilder import arglib
+import warnings
 
 import logging
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger('msmbuilder.scripts.CalculateProjectRMSD')
 
 def run(project, pdb, atom_indices):    
-    distances = -1 * np.ones((project.n_trajs, np.max(project.n_trajs)))
+    distances = -1 * np.ones((project.n_trajs, np.max(project.traj_lengths)))
     rmsd = RMSD(atom_indices)
     ppdb = rmsd.prepare_trajectory(pdb)
     
