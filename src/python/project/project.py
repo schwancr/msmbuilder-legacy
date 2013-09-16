@@ -397,7 +397,6 @@ class Project(object):
         conf['XYZList'] = xyzlist
 
         return conf
->>>>>>> 79b96faf468f48fd047026a6e0aaf983741ea73e
 
     def load_conf(self):
         "Load the PDB associated with this project from disk"
