@@ -3,13 +3,14 @@
 import sys, os
 import pickle
 import numpy as np
+from msmbuilder import Trajectory
 from msmbuilder.metrics.baseclasses import Vectorized
 import itertools
 from pkg_resources import iter_entry_points
 from msmbuilder.metrics import (RMSD, Dihedral, BooleanContact,
                                 AtomPairs, ContinuousContact,
                                 AbstractDistanceMetric,
-                                RedDimPNorm)
+                                RedDimPNorm, Positions)
 
 def add_argument(group, *args, **kwargs):
     if 'default' in kwargs:
@@ -54,8 +55,7 @@ def add_basic_metric_parsers(metric_subparser):
         (cityblock, etc). This code is executed in parallel on multiple cores (but
         not multiple boxes) using OMP. ''') 
     add_argument(dihedral, '-a', dest='dihedral_angles', default='phi/psi',
-        help='which dihedrals. Choose from phi, psi, chi (to choose multiple, seperate them with a slash), or user')
-    add_argument(dihedral, '-f', dest='dihedral_userfilename', default='DihedralIndices.dat', help='filename for dihedral indices, N lines of 4 space-separated indices (otherwise ignored)')
+        help='which dihedrals. Choose from phi, psi, chi. To choose multiple, seperate them with a slash')
     add_argument(dihedral, '-p', dest='dihedral_p', default=2, help='p used for metric=minkowski (otherwise ignored)')
     add_argument(dihedral, '-m', dest='dihedral_metric', default='euclidean',
         help='which distance metric', choices=Dihedral.allowable_scipy_metrics)
@@ -95,6 +95,17 @@ def add_basic_metric_parsers(metric_subparser):
         help='which distance metric', choices=AtomPairs.allowable_scipy_metrics)
     metric_parser_list.append(atompairs)
 
+    positions = metric_subparser.add_parser('positions', description="""POSITIONS: For each frame
+        we represent the conformation as a vector of atom positions, where the atoms have been
+        aligned to a target structure.""")
+    add_argument(positions, '-t', dest='target', help='target structure (PDB) to align structures to.')
+    add_argument(positions, '-a', dest='pos_atom_indices', help='atom indices to include in the distances.')
+    add_argument(positions, '-i', dest='align_indices', help='atom indices to use when aligning to target.')
+    add_argument(positions, '-p', dest='positions_p', default=2, help='p used for metric=minkowski (otherwise ignored)')
+    add_argument(positions, '-m', dest='positions_metric', default='cityblock',
+        help='which distance metric', choices=Positions.allowable_scipy_metrics)
+    metric_parser_list.append(positions)
+
     picklemetric = metric_subparser.add_parser('custom', description="""CUSTOM: Use a custom
         distance metric. This requires defining your metric and saving it to a file using
         the pickle format, which can be done fron an interactive shell. This is an EXPERT FEATURE,
@@ -117,33 +128,8 @@ def add_layer_metric_parsers(metric_subparser):
     #    you must also specify a basic metric to prepare the trajectory with. For example if you used
     #    tICA on dihedrals you would do something like "tica --pca PCAObject.h5 --nv 10 dihedral -a phi/psi"''')
 
-    layer_metric_parser_list = []
-
-    ktica = metric_subparser.add_parser('ktica', description='''
-        kernel-tICA: This is a kernel version of tICA, which can pick the slowest degrees of
-        freedom out of a dataset, but without the constraint of the projection being linear in
-        the input coordinates.''')
-    
-    required = ktica.add_argument_group('required')
-    choose_one = ktica.add_argument_group('selecting projection vectors (choose_one)')
-
-    add_argument(ktica,'-p',dest='p',help='p value for p-norm')
-    add_argument(ktica,'-m',dest='projected_metric',help='metric to use in the projected space',
-        choices= Vectorized.allowable_scipy_metrics, default='euclidean' )
-    add_argument(required, '--po','--projection', dest='proj_object', help='tICA Object which was prepared by tICA_train.py')
-    add_argument(choose_one, '--nv', dest='num_vecs', help='Choose the top <-n> eigenvectors based on their eigenvalues')
-    add_argument(choose_one, '--ab',dest='abs_min', help='Choose all eigenvectors with eigenvalues grater than <--ab>.') 
-    add_argument(choose_one, '--ev',dest='expl_var', help='Choose eigenvectors so that their eigenvalues account for <--ev> percent of the total "variance". Note that this really only makes sense when doing PCA, where the total variance is the sum of the eigenvalues.') 
-    ktica.kernel_parser_list = []
-    ktica_subparsers = ktica.add_subparsers( dest='kernel', description='''  
-        Available kernel functions to use in the kernel tICA analysis.''' )
-
-    ktica.kernel_parser_list = add_layer_kernel_parsers(ktica_subparsers)
-
-    layer_metric_parser_list.extend(ktica.kernel_parser_list)
-
     tica = metric_subparser.add_parser( 'tica', description='''
-        tICA: This metric is based on a variation of PCA which looks for the slowest d.o.f.
+        TICA: This metric is based on a variation of PCA which looks for the slowest d.o.f.
         in the simulation data. See (Schwantes, C.R., Pande, V.S. In Prep.) for details. Or
         contact Christian at schwancr@stanford.edu for an explanation. In addition to these 
         You must provide an additional metric you used to prepare the trajectories in the
@@ -164,9 +150,7 @@ def add_layer_metric_parsers(metric_subparser):
         Available metrics to use in preparing the trajectory before projecting.''' )
     tica.metric_parser_list = add_basic_metric_parsers(tica_subparsers)
 
-    layer_metric_parser_list.extend(tica.metric_parser_list)
-
-    return layer_metric_parser_list
+    return tica.metric_parser_list
 
 def add_metric_parsers(parser, add_layer_metrics=False):
 
@@ -191,7 +175,7 @@ def construct_basic_metric(metric_name, args):
 
     elif metric_name == 'dihedral':
         metric = Dihedral(metric=args.dihedral_metric,
-            p=args.dihedral_p, angles=args.dihedral_angles, userfilename=args.dihedral_userfilename)
+            p=args.dihedral_p, angles=args.dihedral_angles)
     
     elif metric_name == 'contact':
         if args.contact_which != 'all':
@@ -221,6 +205,22 @@ def construct_basic_metric(metric_name, args):
 
         metric = AtomPairs(metric=args.atompairs_metric, p=args.atompairs_p,
             atom_pairs=pairs)
+
+    elif metric_name == 'positions':
+        target = Trajectory.load_from_pdb(args.target)
+        
+        if args.pos_atom_indices != None:
+            atom_indices = np.loadtxt(args.pos_atom_indices, np.int)
+        else:
+            atom_indices = None
+
+        if args.align_indices != None:
+            align_indices = np.loadtxt(args.align_indices, np.int)
+        else:
+            align_indices = None
+        
+        metric = Positions(target, atom_indices=atom_indices, align_indices=align_indices,
+                           metric=args.positions_metric, p=args.positions_p)
              
     elif metric_name == 'custom':
         with open(args.picklemetric_input) as f:
@@ -251,15 +251,8 @@ def construct_layer_metric(metric_name, args ):
 
         return RedDimPNorm( args.proj_object, prep_with = sub_metric, num_vecs = args.num_vecs, abs_min = args.abs_min, metric = args.projected_metric, p = args.p )
 
-    elif metric_name == 'ktica':
-        kernel = construct_layer_kernel( args.kernel, args)
-        
-        return RedDimPNorm(args.proj_object, prep_with=kernel, num_vecs=args.num_vecs, abs_min=args.abs_min, expl_var=args.expl_var, metric=args.projected_metric, p=args.p, kernel=True)
-
 def construct_metric( args ):
     if hasattr( args, 'sub_metric' ):
         return construct_layer_metric( args.metric, args )
     else:
         return construct_basic_metric( args.metric, args )
-
-from msmbuilder.kernels.parsers import add_layer_kernel_parsers, construct_layer_kernel
