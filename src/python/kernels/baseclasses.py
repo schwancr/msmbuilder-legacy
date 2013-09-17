@@ -18,7 +18,6 @@ class AbstractKernel(object):
         return self.one_to_all(prepared_traj1, prepared_traj2[indices2], index1)
 
     def all_to_all(self, prepared_traj1, prepared_traj2):
-        
         return np.vstack([self.one_to_all( prepared_traj1, prepared_traj2, i ) for i in xrange(len(prepared_traj1))])
             
     @abc.abstractmethod

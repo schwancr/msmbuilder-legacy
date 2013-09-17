@@ -104,8 +104,8 @@ def add_basic_metric_parsers(metric_subparser):
     metric_parser_list.append(picklemetric)
     
     for add_parser in locate_metric_plugins('add_metric_parser'):
-        plugin_metric_parser = add_parser(metrics_parsers, add_argument)
-        parser.metric_parsers.append(plugin_metric_parser)
+        plugin_metric_parser = add_parser(metric_subparser, add_argument)
+        metric_parser_list.append(plugin_metric_parser)
     
     return metric_parser_list
 
