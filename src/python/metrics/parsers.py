@@ -3,6 +3,8 @@
 import sys, os
 import pickle
 import numpy as np
+from msmbuilder import io
+from msmbuilder import ktica
 from msmbuilder import Trajectory
 from msmbuilder.metrics.baseclasses import Vectorized
 import itertools
@@ -10,7 +12,7 @@ from pkg_resources import iter_entry_points
 from msmbuilder.metrics import (RMSD, Dihedral, BooleanContact,
                                 AtomPairs, ContinuousContact,
                                 AbstractDistanceMetric,
-                                RedDimPNorm, Positions)
+                                RedDimPNorm, Positions, ktICAPNorm)
 
 def add_argument(group, *args, **kwargs):
     if 'default' in kwargs:
@@ -127,6 +129,8 @@ def add_layer_metric_parsers(metric_subparser):
     #layer_metrics = parser.add_subparsers( description='''Available Hierarchical Metrics to use. Note, 
     #    you must also specify a basic metric to prepare the trajectory with. For example if you used
     #    tICA on dihedrals you would do something like "tica --pca PCAObject.h5 --nv 10 dihedral -a phi/psi"''')
+    
+    parser_list = []
 
     tica = metric_subparser.add_parser( 'tica', description='''
         TICA: This metric is based on a variation of PCA which looks for the slowest d.o.f.
@@ -143,14 +147,29 @@ def add_layer_metric_parsers(metric_subparser):
         choices= Vectorized.allowable_scipy_metrics, default='euclidean' )
     add_argument(required, '--po','--projection', dest='proj_object', help='tICA Object which was prepared by tICA_train.py')
     add_argument(choose_one, '--nv', dest='num_vecs', help='Choose the top <-n> eigenvectors based on their eigenvalues')
-    add_argument(choose_one, '--ab',dest='abs_min', help='Choose all eigenvectors with eigenvalues grater than <--ab>.') 
-    add_argument(choose_one, '--ev',dest='expl_var', help='Choose eigenvectors so that their eigenvalues account for <--ev> percent of the total "variance". Note that this really only makes sense when doing PCA, where the total variance is the sum of the eigenvalues.') 
+    #add_argument(choose_one, '--ab',dest='abs_min', help='Choose all eigenvectors with eigenvalues grater than <--ab>.') 
+    #add_argument(choose_one, '--ev',dest='expl_var', help='Choose eigenvectors so that their eigenvalues account for <--ev> percent of the total "variance". Note that this really only makes sense when doing PCA, where the total variance is the sum of the eigenvalues.') 
     tica.metric_parser_list = []
     tica_subparsers = tica.add_subparsers( dest='sub_metric', description='''  
         Available metrics to use in preparing the trajectory before projecting.''' )
     tica.metric_parser_list = add_basic_metric_parsers(tica_subparsers)
 
-    return tica.metric_parser_list
+    from msmbuilder.kernels.parsers import add_kernel_parsers
+
+    ktica = metric_subparser.add_parser('ktica', description="""
+        ktICA: This metric is based on applying the kernel trick to the tICA method.
+        The result is functions that approximate the transfer operator eigenfunctions
+        """)
+    required = ktica.add_argument_group('required')
+    add_argument(required, '--kt', dest='ktica_obj', help='ktICA object written by ktICASolve.py')
+    add_argument(required, '--nv', dest='num_vecs', type=int, help='number of eigenfunctions to project onto.')
+    add_argument(ktica,'-p',dest='p',help='p value for p-norm')
+    add_argument(ktica,'-m',dest='projected_metric',help='metric to use in the projected space',
+        choices= Vectorized.allowable_scipy_metrics, default='euclidean' )
+
+    ktica.kernel_parser_list = add_kernel_parsers(ktica)
+
+    return tica.metric_parser_list + ktica.kernel_parser_list
 
 def add_metric_parsers(parser, add_layer_metrics=False):
 
@@ -250,6 +269,19 @@ def construct_layer_metric(metric_name, args ):
         sub_metric = construct_basic_metric( args.sub_metric, args )
 
         return RedDimPNorm( args.proj_object, prep_with = sub_metric, num_vecs = args.num_vecs, abs_min = args.abs_min, metric = args.projected_metric, p = args.p )
+
+    elif metric_name == 'ktica':
+
+        kernel_str = io.loadh(args.ktica_obj, 'kernel_str')[0]
+        if kernel_str == 'unpickleable':
+            kernel = construct_layer_kernel(args.kernel, args)
+        else:
+            kernel = None
+
+        kt = ktica.load(args.ktica_obj, kernel=kernel)
+
+        return ktICAPNorm(kt, args.num_vecs, metric=args.projected_metric, p=args.p)
+
 
 def construct_metric( args ):
     if hasattr( args, 'sub_metric' ):
