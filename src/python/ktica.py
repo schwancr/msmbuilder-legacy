@@ -357,7 +357,11 @@ class ktICA(object):
         save results to a .h5 file
         """
     
-        kernel_str = pickle.dumps(self.kernel)
+        try: 
+            kernel_str = pickle.dumps(self.kernel)
+        except:
+            kernel_str = ""
+            print "cannot pickle this kernel :("   
 
         io.saveh(output_fn, ktica_vals=self.eigen_sol[0],
             ktica_vecs=self.eigen_sol[1], K=self.K, 
