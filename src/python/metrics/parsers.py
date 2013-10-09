@@ -93,7 +93,7 @@ def add_basic_metric_parsers(metric_subparser):
     add_argument(atompairs, '-a', dest='atompairs_which',
         help='path to file with 2D array of which atompairs to use.', default='AtomPairs.dat')
     add_argument(atompairs, '-p', dest='atompairs_p', default=2, help='p used for metric=minkowski (otherwise ignored)')
-    add_argument(atompairs, '-m', dest='atompairs_metric', default='cityblock',
+    add_argument(atompairs, '-m', dest='atompairs_metric', default='euclidean',
         help='which distance metric', choices=AtomPairs.allowable_scipy_metrics)
     metric_parser_list.append(atompairs)
 
@@ -104,7 +104,7 @@ def add_basic_metric_parsers(metric_subparser):
     add_argument(positions, '-a', dest='pos_atom_indices', help='atom indices to include in the distances.')
     add_argument(positions, '-i', dest='align_indices', help='atom indices to use when aligning to target.')
     add_argument(positions, '-p', dest='positions_p', default=2, help='p used for metric=minkowski (otherwise ignored)')
-    add_argument(positions, '-m', dest='positions_metric', default='cityblock',
+    add_argument(positions, '-m', dest='positions_metric', default='euclidean',
         help='which distance metric', choices=Positions.allowable_scipy_metrics)
     metric_parser_list.append(positions)
 
