@@ -10,7 +10,7 @@ class ktICA(object):
     class for calculating tICs in a high dimensional feature space
     """
 
-    def __init__(self, kernel, dt, reg_factor=1E-10):
+    def __init__(self, kernel, dt, reg_factor=1E-10, n_components=100):
 
         """
         Initialize an instance of the ktICA solver
@@ -27,6 +27,12 @@ class ktICA(object):
         reg_factor : float, optional
             regularization parameter. This class will use a ridge regression
             when solving the generalized eigenvalue problem
+
+        n_components : int, optional
+            number of components to calculate. Since the number of 
+            eigenfunctions scales with the amount of data, it makes more
+            sense to only calculating the <n_components> that are the 
+            slowest
         """
 
         if not isinstance(kernel, AbstractKernel):
@@ -42,6 +48,8 @@ class ktICA(object):
         self.reg_factor = float(reg_factor)
 
         self.dt = int(dt)
+
+        self.n_components = int(n_components)
 
         self._normalized = False
         self.acf_vals = None
@@ -189,7 +197,11 @@ class ktICA(object):
         lhs = self.K.dot(rot_mat).dot(self.K)
         rhs = self.K.dot(self.K) + np.eye(self.K.shape[0]) * self.reg_factor
 
-        self.eigen_sol = scipy.linalg.eig(lhs, b=rhs)
+#        self.eigen_sol = scipy.linalg.eig(lhs, b=rhs)
+        self.eigen_sol = scipy.sparse.linalg.eigsh(lhs, M=rhs, k=self.n_components, which='LR')
+        # use the sparse implementation which uses ARPACK. Ideally this will
+        # be replaced by a better package, but this is still faster (by a lot)
+        # than getting all eigenvectors with scipy.linalg.eigs
 
         self._normalize()
 
@@ -209,24 +221,14 @@ class ktICA(object):
         if not self._normalized:
             self._normalize()
 
+        ind = np.argsort(self.eigen_sol[0])[::-1]
+
+        self.eigen_sol = (self.eigen_sol[0][ind], self.eigen_sol[1][:, ind])
+
         vecs = self.eigen_sol[1]
         term2 = self.reg_factor * np.square(vecs).sum(axis=0) / vecs.shape[0]
 
         self.acf_vals = self.eigen_sol[0].real * (1 + term2.real)
-
-        dec_ind = np.argsort(self.acf_vals)[::-1]
-        # sort them in descending order
-
-        good_acf_bools = np.abs(self.acf_vals[dec_ind] <= 1)
-        good_acf_inds = dec_ind[np.where(good_acf_bools)]
-        bad_acf_inds = dec_ind[np.where(1 - good_acf_bools)][::-1]
-
-        # don't throw anything out, but put the "bad" ones at the end sorted
-        # by least "badness"
-        end_sorted = np.concatenate([good_acf_inds, bad_acf_inds])
-
-        self.acf_vals = self.acf_vals[end_sorted]
-        self.eigen_sol = (self.eigen_sol[0][end_sorted], self.eigen_sol[1][:, end_sorted])
 
 
     def _normalize(self):
@@ -271,6 +273,17 @@ class ktICA(object):
             projected value of each point in the trajectory
         """
 
+        if isinstance(which, int):
+            which = [which]
+
+        which = np.array(which)
+
+        if which.max() >= self.n_components:
+            raise RuntimeError("cannot project onto more components than we've calculated")
+
+        if not self._normalized:
+            self._normalize()
+
         comp_to_all = []
 
         for i in xrange(len(self._Xall)):
@@ -285,15 +298,6 @@ class ktICA(object):
         comp_to_all = comp_to_all - np.reshape(comp_to_all.sum(axis=1), (-1, 1)) / float(M) \
                         - self.K_uncentered.sum(axis=0) / float(M) \
                         + self.K_uncentered.sum() / float(M) / float(M)
-
-
-        if isinstance(which, int):
-            which = [which]
-
-        which = np.array(which)
-
-        if not self._normalized:
-            self._normalize()
 
         vecs = self.eigen_sol[1][:, which]
 
@@ -333,7 +337,7 @@ class ktICA(object):
         N = projA.shape[0]
         projA = np.hstack([np.ones((N, 1)), projA])
         projB = np.hstack([np.ones((N, 1)), projB])
-        vals = np.concatenate([[1], self.acf_vals[:num_vecs]]).real
+        vals = np.concatenate([[1], self.eigen_sol[0][:num_vecs]]).real
         vals = np.power(vals, exponent)
         vals = np.reshape(vals, (-1, 1))
         if len(equilA.shape) == 1:
