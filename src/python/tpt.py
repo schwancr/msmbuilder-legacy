@@ -66,6 +66,40 @@ def _check_sources_sinks(sources, sinks):
 # Path Finding Functions
 #
 
+def find_top_paths2(sources, sinks, tprob, num_paths=10, net_flux=None):
+    """
+    Calls the Dijkstra algorithm to find the top 'num_paths' through
+    an MSM from the sources to the sinks. These paths will be selected
+    by the smallest cost, which is the highest flux.
+
+    After finding the top path, the algorithm is repeated with those
+    edges in the top path having their fluxes decreased by the flux
+    in the top path.
+    
+    Parameters
+    ----------
+    sources : array_like
+        source states
+    sinks : array_like
+        sink states
+    tprob : np.ndarray or scipy.sparse matrix
+        transition probability matrix
+    num_paths : int, optional
+        number of paths to find in this MSM, according to Dijkstra
+    net_flux : np.ndarray or scipy.sparse matrix, optional
+        net flux matrix, if already calculated
+
+    Returns
+    -------
+    paths : np.ndarray
+        array containig all found paths
+    fluxes : np.ndarray
+        fluxes for each path
+    """
+
+    pass
+
+
 def find_top_paths(sources, sinks, tprob, num_paths=10, node_wipe=False, net_flux=None):
     r"""
     Calls the Dijkstra algorithm to find the top 'NumPaths'.
