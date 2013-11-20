@@ -1238,15 +1238,15 @@ class __Reversible_MLE_Estimator_dense__(object):
     def update_sqr_X(self, X):
 
         # use the cached matrix
-        if not self.last_X is None:
-            if np.sum(np.abs(X - self.last_X)) < 1E-8:
-                return
+        #if not self.last_X is None:
+        #    if np.sum(np.abs(X - self.last_X)) < 1E-12:
+        #        return
    
         self.sqr_X *= 0
         self.sqr_X[self.upper_inds] = X
         
         self.sqr_X = self.sqr_X + self.sqr_X.T - np.diag(np.diag(self.sqr_X))
-        self.last_X = X
+    #    self.last_X = X
 
 
     def log_likelihood(self, X):
@@ -1267,7 +1267,7 @@ class __Reversible_MLE_Estimator_dense__(object):
 
         self.update_sqr_X(X)
 
-        loglike_vector = self.counts * np.log(self.sqr_X)
+        loglike_vector = self.counts * np.log(self.sqr_X / np.reshape(self.sqr_X.sum(1), (-1,1)))
         loglike_vector[np.where(self.counts == 0)] = 0
 
         return loglike_vector.sum()
@@ -1275,7 +1275,7 @@ class __Reversible_MLE_Estimator_dense__(object):
 
     def dlog_likelihood(self, X):
         """
-        Rerturn the gradient of the log-likelihood for a matrix X
+        Return the gradient of the log-likelihood for a matrix X
         
         Parameters
         ----------
@@ -1325,6 +1325,8 @@ class __Reversible_MLE_Estimator_dense__(object):
 
         parms, final_log_likelihood, info_dict = scipy.optimize.fmin_l_bfgs_b(
             f, start_X, df, disp=0, factr=0.001, m=26)  
+        #parms, final_log_likelihood, info_dict = scipy.optimize.fmin_l_bfgs_b(
+        #    f, start_X, fprime=None, approx_grad=True, disp=0, factr=0.001, m=26)  
         # m is the number of variable metric correcitons.  m=26 seems to give ~15% speedup
 
         self.update_sqr_X(parms)
