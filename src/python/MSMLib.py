@@ -1189,6 +1189,149 @@ class __Reversible_MLE_Estimator__():
         return X
 
 
+class __Reversible_MLE_Estimator_dense__(object):
+    """
+    Reversible MLE for dense count matrices
+
+    Parameters
+    ----------
+    counts : np.ndarray
+        2D array with transition counts. Should be strongly connected
+        (i.e. you should probably do ergodic trimming before using it here
+
+    """
+    def __init__(self, counts):
+        if scipy.sparse.issparse(counts):
+            self.counts = counts.asarray()
+
+        else:
+            self.counts = counts
+
+        shape = self.counts.shape
+        if len(shape) != 2:
+            raise Exception("need to pass a two dim. array")
+
+        if shape[0] != shape[1]:
+            raise Exception("counts must be square")
+
+        self.n_states = shape[0]
+        self.raw_row_counts = self.counts.sum(1)
+        temp_i = []
+        temp_j = []
+        count = 0
+        for i in xrange(self.n_states):
+            j = self.n_states - i
+            temp_i.extend([i] * j)
+            temp_j.extend(range(i, i + j))
+
+        self.upper_inds = (np.array(temp_i, dtype=np.int), np.array(temp_j, dtype=np.int))
+
+        self.sqr_X = np.zeros((self.n_states, self.n_states))
+        self.last_X = None
+
+
+    def update_sqr_X(self, X)
+
+        # use the cached matrix
+        if not self.last_X is None:
+            if np.sum(np.abs(X - self.last_X)) < 1E-8:
+                return
+   
+        self.sqr_X *= 0
+        self.sqr_X[self.upper_inds] = X
+            
+        self.sqr_X = self.sqr_X + self.sqr_X.T
+        self.last_X = X
+
+
+    def log_likelihood(self, X):
+        """
+        Return the log likelihood for a matrix X
+        
+        Parameters
+        ----------
+        X : np.ndarray
+            X is a one dim. np.ndarray representing the upper triangle
+            of the reversible counts matrix
+        
+        Returns
+        -------
+        log_like : np.float
+            log likelihood of X given the counts
+        """
+
+        self.update_sqr_X()
+
+        loglike_vector = self.counts * np.log(self.sqr_X)
+        loglike_vector[np.where(self.counts == 0)] = 0
+
+        return loglike_vector.sum()
+
+
+    def dlog_likelihood(self, X):
+        """
+        Rerturn the gradient of the log-likelihood for a matrix X
+        
+        Parameters
+        ----------
+        X : np.ndarray
+            X is a one dim. np.ndarray representing the upper triangle of
+            of the reversible counts matrix
+
+        Returns
+        -------
+        dlog_like : np.ndarray
+            gradient of the log-likelihood
+
+        """
+
+        self.update_sqr_X()
+        current_row_counts = self.sqr_X.sum(1)
+        row_ratios = self.raw_row_counts / current_row_counts
+
+        temp = self.counts / self.sqr_X - row_ratios
+        temp = temp + temp.T
+
+        dlog_like = temp[self.upper_inds]
+        
+        return dlog_like
+
+ 
+    def optimize(self):
+        """Maximize the log_likelihood to find the MLE reversible counts.
+
+        Returns
+        -------
+        X : scipy.sparse.csr_matrix
+            Returns the MLE reversible (symmetric) counts matrix
+
+        Notes
+        -----
+        This algorithm uses the symmetrized counts as an initial guess.
+
+        """
+        start_X = self.counts + self.counts.T
+        start_X = start_X[self.upper_inds]
+        initial_log_likelihood = -1 * f(start_X)
+
+        f = lambda x: -1 * self.log_likelihood(x)
+        df = lambda x: -1 * self.dlog_likelihood(x)
+
+        parms, final_log_likelihood, info_dict = scipy.optimize.fmin_l_bfgs_b(
+            f, start_X, df, disp=0, factr=0.001, m=26)  
+        # m is the number of variable metric correcitons.  m=26 seems to give ~15% speedup
+
+        self.update_sqr_X(parms)
+        X = self.sqr_X
+        X *= (self.counts.sum() / X.sum())
+        final_log_likelihood *= -1
+        logger.info("BFGS likelihood maximization terminated after %d function calls.  Initial and final log likelihoods: %f, %f." %
+                    (info_dict["funcalls"], initial_log_likelihood, final_log_likelihood))
+        if info_dict["warnflag"] != 0:
+            logger.warn("Abnormal termination of BFGS likelihood maximization.  Error code %d" % info_dict["warnflag"])
+        return X
+   
+
 ######################################################################
 #  ALIASES FOR DEPRECATED FUNCTION NAMES
 #  THESE FUNCTIONS WERE ADDED FOR VERSION 2.6 AND
