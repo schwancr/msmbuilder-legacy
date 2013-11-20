@@ -132,7 +132,7 @@ class test_build_msm(object):
 
         C = MSMLib.get_count_matrix_from_assignments(self.assignments, 2)
         rc, t, p, m = MSMLib.build_msm(
-            C, symmetrize='MLE', ergodic_trimming=True)
+            C, symmetrize='MLE', ergodic_trimming=True, dense=False)
 
         eq(rc.todense(),
             np.matrix([[6.46159184, 4.61535527],
@@ -143,6 +143,20 @@ class test_build_msm(object):
         eq(p, np.array([0.61538595, 0.38461405]), decimal=5)
         eq(m, np.array([0, 1]))
 
+    def test_2(self):
+
+        C = MSMLib.get_count_matrix_from_assignments(self.assignments, 2)
+        rc, t, p, m = MSMLib.build_msm(
+            C, symmetrize='MLE', ergodic_trimming=True, dense=True)
+
+        eq(rc,
+            np.array([[6.46159184, 4.61535527],
+                       [4.61535527, 2.30769762]]), decimal=4)
+        eq(t,
+            np.array([[0.58333689, 0.41666311],
+                       [0.66666474, 0.33333526]]), decimal=4)
+        eq(p, np.array([0.61538595, 0.38461405]), decimal=5)
+        eq(m, np.array([0, 1]))
 
 def test_estimate_transition_matrix_1():
     np.random.seed(42)

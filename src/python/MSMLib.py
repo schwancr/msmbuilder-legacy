@@ -137,7 +137,7 @@ def estimate_transition_matrix(count_matrix):
     return tProb
 
 
-def build_msm(counts, symmetrize='MLE', ergodic_trimming=True):
+def build_msm(counts, symmetrize='MLE', ergodic_trimming=True, dense=False):
     """
     Estimates the transition probability matrix from the counts matrix.
 
@@ -175,7 +175,7 @@ def build_msm(counts, symmetrize='MLE', ergodic_trimming=True):
 
     # Apply a symmetrization scheme
     if symmetrize == 'mle':
-        rev_counts = mle_reversible_count_matrix(counts)
+        rev_counts = mle_reversible_count_matrix(counts, dense=dense)
     elif symmetrize == 'transpose':
         rev_counts = 0.5 * (counts + counts.transpose())
     elif symmetrize == 'none':
@@ -951,7 +951,7 @@ def permute_mat(A, permutation):
     return permuted_A
 
 
-def mle_reversible_count_matrix(count_matrix):
+def mle_reversible_count_matrix(count_matrix, dense=False):
     """Maximum likelihood estimate for a reversible count matrix
 
     Parameters
@@ -971,7 +971,12 @@ def mle_reversible_count_matrix(count_matrix):
     on the math used during these calculations.
 
     """
-    mle = __Reversible_MLE_Estimator__(count_matrix)
+
+    if dense:
+        mle = __Reversible_MLE_Estimator_dense__(count_matrix)
+    else:
+        mle = __Reversible_MLE_Estimator__(count_matrix)
+
     return mle.optimize()
 
 # This class is hidden: you should use the helper function instead.
@@ -1202,7 +1207,7 @@ class __Reversible_MLE_Estimator_dense__(object):
     """
     def __init__(self, counts):
         if scipy.sparse.issparse(counts):
-            self.counts = counts.asarray()
+            self.counts = counts.toarray()
 
         else:
             self.counts = counts
@@ -1230,7 +1235,7 @@ class __Reversible_MLE_Estimator_dense__(object):
         self.last_X = None
 
 
-    def update_sqr_X(self, X)
+    def update_sqr_X(self, X):
 
         # use the cached matrix
         if not self.last_X is None:
@@ -1239,8 +1244,8 @@ class __Reversible_MLE_Estimator_dense__(object):
    
         self.sqr_X *= 0
         self.sqr_X[self.upper_inds] = X
-            
-        self.sqr_X = self.sqr_X + self.sqr_X.T
+        
+        self.sqr_X = self.sqr_X + self.sqr_X.T - np.diag(np.diag(self.sqr_X))
         self.last_X = X
 
 
@@ -1260,7 +1265,7 @@ class __Reversible_MLE_Estimator_dense__(object):
             log likelihood of X given the counts
         """
 
-        self.update_sqr_X()
+        self.update_sqr_X(X)
 
         loglike_vector = self.counts * np.log(self.sqr_X)
         loglike_vector[np.where(self.counts == 0)] = 0
@@ -1285,12 +1290,12 @@ class __Reversible_MLE_Estimator_dense__(object):
 
         """
 
-        self.update_sqr_X()
+        self.update_sqr_X(X)
         current_row_counts = self.sqr_X.sum(1)
         row_ratios = self.raw_row_counts / current_row_counts
 
-        temp = self.counts / self.sqr_X - row_ratios
-        temp = temp + temp.T
+        temp = self.counts / self.sqr_X - row_ratios.reshape((-1, 1))
+        temp = temp + temp.T - np.diag(np.diag(temp))
 
         dlog_like = temp[self.upper_inds]
         
@@ -1310,12 +1315,13 @@ class __Reversible_MLE_Estimator_dense__(object):
         This algorithm uses the symmetrized counts as an initial guess.
 
         """
-        start_X = self.counts + self.counts.T
+        start_X = (self.counts + self.counts.T) * 0.5
         start_X = start_X[self.upper_inds]
-        initial_log_likelihood = -1 * f(start_X)
 
         f = lambda x: -1 * self.log_likelihood(x)
         df = lambda x: -1 * self.dlog_likelihood(x)
+
+        initial_log_likelihood = -1 * f(start_X)
 
         parms, final_log_likelihood, info_dict = scipy.optimize.fmin_l_bfgs_b(
             f, start_X, df, disp=0, factr=0.001, m=26)  
