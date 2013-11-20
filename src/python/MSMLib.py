@@ -149,6 +149,8 @@ def build_msm(counts, symmetrize='MLE', ergodic_trimming=True, dense=False):
         symmetrization scheme so that we have reversible counts
     ergodic_trim : bool (optional)
         whether or not to trim states to achieve an ergodic model
+    dense : bool, optional
+        if True, then do everything with dense matrices
 
     Returns
     -------
@@ -165,11 +167,16 @@ def build_msm(counts, symmetrize='MLE', ergodic_trimming=True, dense=False):
 
     symmetrize = str(symmetrize).lower()
     symmetrization_error = ValueError("Invalid symmetrization scheme requested: %s. Exiting." % symmetrize)
+    
+    if dense:
+        logger.warn("ergodic trimming not implemented for dense graphs yet")
+        ergodic_trimming = False
+
     if symmetrize not in ['mle', 'transpose', 'none']:
         raise symmetrization_error
 
     if ergodic_trimming:
-        counts, mapping = ergodic_trim(counts)
+        counts, mapping = ergodic_trim(counts, dense=dense)
     else:
         mapping = np.arange(counts.shape[0])
 
@@ -198,7 +205,8 @@ def build_msm(counts, symmetrize='MLE', ergodic_trimming=True, dense=False):
     return rev_counts, t_matrix, populations, mapping
 
 
-def get_count_matrix_from_assignments(assignments, n_states=None, lag_time=1, sliding_window=True):
+def get_count_matrix_from_assignments(assignments, n_states=None, lag_time=1, 
+    sliding_window=True, dense=False):
     """
     Calculate counts matrix from `assignments`.
 
@@ -212,10 +220,12 @@ def get_count_matrix_from_assignments(assignments, n_states=None, lag_time=1, sl
         the LagTime with which to estimate the count matrix. Default: 1
     sliding_window: bool, optional
         Use a sliding window.  Default: True
+    dense : bool, optional
+        use dense matrices instead of sparse
 
     Returns
     -------
-    counts : sparse matrix
+    counts : sparse matrix, or np.ndarray
         `Counts[i,j]` stores the number of times in the assignments that a
         trajectory went from state i to state j in `LagTime` frames
 
@@ -236,7 +246,10 @@ def get_count_matrix_from_assignments(assignments, n_states=None, lag_time=1, sl
         if n_states < 1:
             raise ValueError()
 
-    C = scipy.sparse.lil_matrix((int(n_states), int(n_states)), dtype='float32')  # Lutz: why are we using float for count matrices?
+    if dense:
+        C = np.zeros((n_states, n_states))
+    else:
+        C = scipy.sparse.lil_matrix((int(n_states), int(n_states)), dtype='float32')  # Lutz: why are we using float for count matrices?
 
     for A in assignments:
         FirstEntry = np.where(A != -1)[0]
@@ -245,12 +258,13 @@ def get_count_matrix_from_assignments(assignments, n_states=None, lag_time=1, sl
         if len(FirstEntry) >= 1:
             FirstEntry = FirstEntry[0]
             A = A[FirstEntry:]
-            C = C + get_counts_from_traj(A, n_states, lag_time=lag_time, sliding_window=sliding_window)  # .tolil()
+            C = C + get_counts_from_traj(A, n_states, lag_time=lag_time, 
+                sliding_window=sliding_window, dense=dense)
 
     return C
 
 
-def get_counts_from_traj(states, n_states=None, lag_time=1, sliding_window=True):
+def get_counts_from_traj(states, n_states=None, lag_time=1, sliding_window=True, dense=False):
     """Computes the transition count matrix for a sequence of states (single trajectory).
 
     Parameters
@@ -265,11 +279,14 @@ def get_counts_from_traj(states, n_states=None, lag_time=1, sliding_window=True)
         The time delay over which transitions are counted
     sliding_window : bool, optional
         Use sliding window
+    dense : bool, optional
+        return a dense counts matrix instead of a sparse one
 
     Returns
     -------
-    C : sparse matrix of integers
-        The computed transition count matrix
+    C : sparse matrix, or np.ndarray
+        The computed transition count matrix. Type corresponds to the
+        dense kwarg
     """
 
     check_assignment_array_input(states, ndim=1)
@@ -285,18 +302,24 @@ def get_counts_from_traj(states, n_states=None, lag_time=1, sliding_window=True)
         to_states = states[lag_time:: lag_time]
     assert from_states.shape == to_states.shape
 
-    transitions = np.row_stack((from_states, to_states))
-    counts = np.ones(transitions.shape[1], dtype=int)
-    try:
-        C = scipy.sparse.coo_matrix((counts, transitions),
-                                    shape=(n_states, n_states))
-    except ValueError:
-        # Lutz: if we arrive here, there was probably a state with index -1
-        # we try to fix it by ignoring transitions in and out of those states
-        # (we set both the count and the indices for those transitions to 0)
-        mask = transitions < 0
-        counts[mask[0, :] | mask[1, :]] = 0
-        transitions[mask] = 0
+    ind = np.where((from_states != -1) & (to_states != -1))[0]
+
+    from_states = from_states[ind]
+    to_states = to_states[ind]
+
+    if dense:
+        sol = np.histogram2d(from_states, to_states, bins=np.arange(n_states + 1))
+
+        assert sol[1][0] == 0 # first bin should begin at zero in both directions
+        assert sol[2][0] == 0
+        assert sol[1][-1] == n_states
+        assert sol[2][-1] == n_states
+
+        C = sol[0].astype(int)
+
+    else:
+        transitions = np.row_stack((from_states, to_states))
+        counts = np.ones(transitions.shape[1], dtype=int)
         C = scipy.sparse.coo_matrix((counts, transitions),
                                     shape=(n_states, n_states))
 
@@ -551,7 +574,7 @@ def tarjan(graph):
     return(components)
 
 
-def ergodic_trim(counts, assignments=None):
+def ergodic_trim(counts, assignments=None, dense=False):
     """Use Tarjan's Algorithm to find maximal strongly connected subgraph.
 
     Parameters
@@ -560,6 +583,8 @@ def ergodic_trim(counts, assignments=None):
         transition counts
     assignments : ndarray, optional
         Optionally map assignments to the new states, nulling out disconnected regions.
+    dense : bool, optional
+        use dense matrices rather than sparse ones
 
     Notes
     -----
