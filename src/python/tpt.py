@@ -115,9 +115,14 @@ def get_top_path(sources, sinks, net_flux):
                                                   # highest flux path to it from the source set
         visited[test_node] = True
 
-        if test_node in sinks: # I *think* we want to break ... or are there paths we still 
-                               # need to check?
-            continue # I think if sinks is more than one state we have to check everything
+        if np.all(visited[sinks]):
+            # if we've visited all of the sink states, then we just have to choose
+            # the path that goes to the sink state that is closest to the source
+            break
+
+        #if test_node in sinks: # I *think* we want to break ... or are there paths we still 
+        #                       # need to check?
+        #    continue # I think if sinks is more than one state we have to check everything
 
         # now update the distances for each neighbor of the test_node:
         neighbors = np.where(net_flux[test_node, :].toarray() > 0)[1]
@@ -261,6 +266,10 @@ def get_paths(sources, sinks, net_flux, num_paths=np.inf, flux_cutoff=(1-1E-10))
         fluxes.append(flux)
 
         expl_flux += flux / total_flux
+
+        logger.info("Found %s" % str(path.astype(int)))
+        logger.info("\twith flux %.4e (%.2f%% of total)" % (flux, expl_flux * 100))
+
         counter += 1
         if counter >= num_paths or expl_flux >= flux_cutoff:
             break
@@ -665,7 +674,7 @@ def calculate_fluxes(sources, sinks, tprob, populations=None, committors=None):
 
     # check if we got the populations
     if populations is None:
-        eigens = msm_analysis.get_eigenvectors(tprob, 1)
+        eigens = msm_analysis.get_eigenvectors(tprob, 5)
         if np.count_nonzero(np.imag(eigens[1][:, 0])) != 0:
             raise ValueError('First eigenvector has imaginary components')
         populations = np.real(eigens[1][:, 0])
