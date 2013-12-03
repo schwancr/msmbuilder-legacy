@@ -269,6 +269,7 @@ could stride a little at the begining, but its not recommended.""")
 
                 traj_ind = m.group(1)
                 eps = io.loadh(os.path.join(args.epsilon_dir, 'eps%d.h5' % traj_ind), 'arr_0')
+                eps = eps[::args.stride]
                 epsilons.append(eps)
 
         ptrajs = [metric.prepare_trajectory(t, epsilons=e) for t, e in zip(trajectories, epsilons)]
