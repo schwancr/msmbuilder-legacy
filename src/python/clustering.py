@@ -88,6 +88,15 @@ def concatenate_prep_trajectories(prep_trajectories, metric):
         
         ptraj = metric.TheoData(xyz)
 
+    elif isinstance(metric, DriftMetric):
+        
+        base_ptrajs = [p['base_ptraj'] for p in prep_trajectories]
+        base_ptraj = concatenate_prep_trajectories(base_ptrajs, metric.base_metric)
+
+        epsilon = np.concatenate([p['epsilons'] for p in prep_trajectories])
+
+        ptraj = (base_ptraj, epsilon)
+    
     else:
         raise Exception("unrecognized prepared trajectory." 
             "NOTE: LPRMSD currently unsupported. Email schwancr@stanford.edu")

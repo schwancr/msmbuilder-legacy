@@ -253,6 +253,13 @@ could stride a little at the begining, but its not recommended.""")
         which = None
         n_trajs = len(trajectories)
 
+    if isinstance(metric, metrics.DriftMetric):
+        ptrajs = [metric.prepare_trajectory(t, epsilons=None) for t in trajectories]
+        # If this step is slow, then consider editing this script and loading the
+        # epsilons in rather than recalculating them. Just pass a np.ndarray for 
+        # each trajectory instead of 'None' above.
+        trajectories = None
+
     logger.info('Loaded %d trajs', n_trajs)
 
     clusterer = cluster(metric, trajectories, ptrajs, args, **extra_kwargs)
