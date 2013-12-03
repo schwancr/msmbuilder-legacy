@@ -139,7 +139,6 @@ class DriftMetric(AbstractDistanceMetric):
                 if len(epsilons) != len( trajectory ):
                     raise Exception( "Input epsilons (%d) are not the same length as the trajectory (%d)" % ( len(epsilons), len(trajectory)) )
             super( DriftMetric.DriftTrajectory, self).__init__(tempDict)
-            #self = copy.copy( tempDict )
 
         def __len__( self ):
             return len( self['base_ptraj'] )
@@ -160,8 +159,11 @@ class DriftMetric(AbstractDistanceMetric):
         self.tau = int(tau)
         self.base_metric = base_metric
 
-    def prepare_trajectory(self, trajectory, lengths=None):
-        if isinstance( trajectory, tuple ):
+    def prepare_trajectory(self, trajectory, lengths=None, epsilons=None):
+
+        if not epsilons is None:
+            return self.DriftTrajectory(trajectory, self, lengths=lengths, epsilons=epsilons)
+        elif isinstance( trajectory, tuple ):
             return self.DriftTrajectory( trajectory[0], self, lengths=lengths, epsilons=trajectory[1] )
         else:
             return self.DriftTrajectory( trajectory, self, lengths=lengths )

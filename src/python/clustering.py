@@ -81,21 +81,23 @@ def concatenate_prep_trajectories(prep_trajectories, metric):
     if isinstance(prep_trajectories[0], np.ndarray):
         ptraj = np.concatenate(prep_trajectories)
 
-    elif isinstance(prep_trajectories[0], RMSD.TheoData):
+    elif isinstance(prep_trajectories[0], metrics.RMSD.TheoData):
         
         xyz = np.concatenate([p.XYZData[:, :, :p.NumAtoms] for p in prep_trajectories])
         xyz = xyz.transpose((0, 2, 1))
         
         ptraj = metric.TheoData(xyz)
 
-    elif isinstance(metric, DriftMetric):
+    elif isinstance(metric, metrics.DriftMetric):
         
         base_ptrajs = [p['base_ptraj'] for p in prep_trajectories]
         base_ptraj = concatenate_prep_trajectories(base_ptrajs, metric.base_metric)
 
         epsilon = np.concatenate([p['epsilons'] for p in prep_trajectories])
 
-        ptraj = (base_ptraj, epsilon)
+        ptraj = prep_trajectories[0]
+        ptraj['base_ptraj'] = base_ptraj
+        ptraj['epsilons'] = epsilon
     
     else:
         raise Exception("unrecognized prepared trajectory." 

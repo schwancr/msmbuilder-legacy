@@ -258,6 +258,7 @@ could stride a little at the begining, but its not recommended.""")
         # If this step is slow, then consider editing this script and loading the
         # epsilons in rather than recalculating them. Just pass a np.ndarray for 
         # each trajectory instead of 'None' above.
+        traj = clustering.concatenate_trajectories(trajectories)
         trajectories = None
 
     logger.info('Loaded %d trajs', n_trajs)
@@ -269,6 +270,9 @@ could stride a little at the begining, but its not recommended.""")
         if isinstance(metric, metrics.Vectorized):
             gen_inds = clusterer.get_generator_indices()
             generators = project.load_frame(which[gen_inds,0], which[gen_inds,1])
+        elif isinstance(metric, metrics.DriftMetric):
+            gen_inds = clusterer.get_generator_indices()
+            generators = traj[gen_inds]
         else:
             generators = clusterer.get_generators_as_traj()
         
