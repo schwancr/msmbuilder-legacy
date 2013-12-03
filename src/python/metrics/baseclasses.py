@@ -95,7 +95,9 @@ class AbstractDistanceMetric(object):
         A subclass should be able to provide a more efficient implementation of
         this
         """
-        
+        if not isinstance(indices2, np.ndarray):
+            indices2 = np.array(indices2)
+
         return self.one_to_all(prepared_traj1, prepared_traj2[indices2], index1)
         
     
