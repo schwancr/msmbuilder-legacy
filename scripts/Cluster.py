@@ -51,6 +51,10 @@ parser.add_argument('output_dir', help='''Output directory to save clustering da
     (4) ZMatrix.h5 (If clustering is hierarchical):
         This is the ZMatrix corresponding to the result of hierarchical clustering.
         use it with AssignHierarchical.py to build your assignments file.''')
+parser.add_argument('epsilon_dir', help='''#### Hack for using the drift metric. This
+    is a directory that contains the epsilon neighborhoods for each snapshot of the 
+    dataset. There should be a single file, called epsX.h5 for each trjX.lh5 in 
+    Trajectories/''', default='./Epsilons')
 
 ################################################################################
 
@@ -254,12 +258,26 @@ could stride a little at the begining, but its not recommended.""")
         n_trajs = len(trajectories)
 
     if isinstance(metric, metrics.DriftMetric):
-        ptrajs = [metric.prepare_trajectory(t, epsilons=None) for t in trajectories]
+        if not os.path.exists(args.epsilon_dir):
+            epsilons = [None] * project.n_trajs
+        else:
+            epsilons = []
+            for i in xrange(project.n_trajs):
+                m = re.search("trj(\d+)\.lh5", project.traj_filename(i))
+                if not m:
+                    raise Exception("cannot parse the trajectory filename")
+
+                traj_ind = m.group(1)
+                eps = io.loadh(os.path.join(args.epsilon_dir, 'eps%d.h5' % traj_ind), 'arr_0')
+                epsilons.append(eps)
+
+        ptrajs = [metric.prepare_trajectory(t, epsilons=e) for t, e in zip(trajectories, epsilons)]
         # If this step is slow, then consider editing this script and loading the
         # epsilons in rather than recalculating them. Just pass a np.ndarray for 
         # each trajectory instead of 'None' above.
         traj = clustering.concatenate_trajectories(trajectories)
         trajectories = None
+
 
     logger.info('Loaded %d trajs', n_trajs)
 
