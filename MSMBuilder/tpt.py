@@ -17,7 +17,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 """
-Functions for performing Transition Path Theory calculations.
+Functions for performing Transition Path Theory calculations. 
 
 Written and maintained by TJ Lane <tjlane@stanford.edu>
 Contributions from Kyle Beauchamp, Robert McGibbon, Vince Voelz,
@@ -165,6 +165,81 @@ def get_top_path(sources, sinks, net_flux):
     return np.array(top_path[::-1]), min_fluxes[top_path[0]]
 
 
+def get_paths(sources, sinks, net_flux, num_paths=np.inf, flux_cutoff=(1-1E-10)):
+    """
+        Get the top N paths by iteratively performing Dijkstra's
+        algorithm, but at each step modifying the net flux matrix
+        by subtracting the previously found path's flux from each
+        edge in that path.
+        
+        Parameters
+        ----------
+        sources : array_like
+        nodes to define the source states
+        sinks : array_like
+        nodes to define the sink states
+        net_flux : scipy.sparse matrix
+        net flux of the MSM
+        num_paths : int, optional
+        number of paths to find
+        flux_cutoff : float, optional
+        quit finding paths once the explained flux is greater
+        this cutoff (as a percentage of the total)
+        
+        Returns
+        -------
+        paths : np.ndarray
+        list of paths
+        fluxes : np.ndarray
+        flux of each path returned
+        """
+    
+    _check_sources_sinks(sources, sinks)
+    
+    net_flux = copy.deepcopy(net_flux.tolil())
+    
+    paths = []
+    fluxes = []
+    
+    total_flux = net_flux[sources, :].sum()
+    # total flux is the total flux coming from the sources (or going into the sinks)
+    
+    not_done = True
+    counter = 0
+    expl_flux = 0.0
+    while not_done:
+        path, flux = get_top_path(sources, sinks, net_flux)
+        
+        paths.append(path)
+        fluxes.append(flux)
+        
+        expl_flux += flux / total_flux
+        
+        logger.info("Found %s" % str(path.astype(int)))
+        logger.info("\twith flux %.4e (%.2f%% of total)" % (flux, expl_flux * 100))
+        
+        counter += 1
+        if counter >= num_paths or expl_flux >= flux_cutoff:
+            break
+        
+        # modify the net_flux matrix
+        for k in xrange(len(path) - 1):
+            net_flux[path[k], path[k+1]] -= flux
+    # since flux is the bottleneck, this will never be negative
+    # though... this might lead to CLOS which is bad...
+    # I'll fix this (^^^^) later.. for now let's get it working
+    
+    
+    max_len = np.max([len(p) for p in paths])
+    temp = np.ones((len(paths), max_len)) * -1
+    for i in range(len(paths)):
+        temp[i][:len(paths[i])] = paths[i]
+    
+    fluxes = np.array(fluxes)
+    
+    return temp, fluxes
+
+
 def _get_enumerated_paths(sources, sinks, net_flux, num_paths=1):
     """
     get all possible paths, sorted from highest to lowest flux
@@ -219,81 +294,6 @@ def _get_enumerated_paths(sources, sinks, net_flux, num_paths=1):
         edges.append([[test_path[i], test_path[i + 1]] for i in xrange(len(test_path) - 1)])
         fluxes.append(test_flux)
             
-    max_len = np.max([len(p) for p in paths])
-    temp = np.ones((len(paths), max_len)) * -1
-    for i in range(len(paths)):
-        temp[i][:len(paths[i])] = paths[i]
-
-    fluxes = np.array(fluxes)
-
-    return temp, fluxes
-
-
-def get_paths(sources, sinks, net_flux, num_paths=np.inf, flux_cutoff=(1-1E-10)):
-    """
-    Get the top N paths by iteratively performing Dijkstra's
-    algorithm, but at each step modifying the net flux matrix
-    by subtracting the previously found path's flux from each 
-    edge in that path.
-    
-    Parameters
-    ----------
-    sources : array_like
-        nodes to define the source states
-    sinks : array_like
-        nodes to define the sink states
-    net_flux : scipy.sparse matrix
-        net flux of the MSM
-    num_paths : int, optional
-        number of paths to find
-    flux_cutoff : float, optional
-        quit finding paths once the explained flux is greater
-        this cutoff (as a percentage of the total)
-
-    Returns
-    -------
-    paths : np.ndarray
-        list of paths
-    fluxes : np.ndarray
-        flux of each path returned
-    """
-
-    _check_sources_sinks(sources, sinks)
-
-    net_flux = copy.deepcopy(net_flux.tolil())
-
-    paths = []
-    fluxes = []
-
-    total_flux = net_flux[sources, :].sum()
-    # total flux is the total flux coming from the sources (or going into the sinks)
-
-    not_done = True
-    counter = 0
-    expl_flux = 0.0
-    while not_done:
-        path, flux = get_top_path(sources, sinks, net_flux)
-
-        paths.append(path)
-        fluxes.append(flux)
-
-        expl_flux += flux / total_flux
-
-        logger.info("Found %s" % str(path.astype(int)))
-        logger.info("\twith flux %.4e (%.2f%% of total)" % (flux, expl_flux * 100))
-
-        counter += 1
-        if counter >= num_paths or expl_flux >= flux_cutoff:
-            break
-
-        # modify the net_flux matrix
-        for k in xrange(len(path) - 1):
-            net_flux[path[k], path[k+1]] -= flux
-            # since flux is the bottleneck, this will never be negative
-            # though... this might lead to CLOS which is bad...
-            # I'll fix this (^^^^) later.. for now let's get it working
-
-
     max_len = np.max([len(p) for p in paths])
     temp = np.ones((len(paths), max_len)) * -1
     for i in range(len(paths)):
@@ -368,7 +368,7 @@ def _find_top_paths_cut(sources, sinks, tprob, num_paths=10, node_wipe=False, ne
         net_flux = net_flux.tolil()
 
     # run the initial Dijkstra pass
-    pi, b = Dijkstra(sources, sinks, net_flux)
+    pi, b = _Dijkstra(sources, sinks, net_flux)
 
     logger.info("Path Num | Path | Bottleneck | Flux")
 
@@ -420,7 +420,7 @@ def _find_top_paths_cut(sources, sinks, tprob, num_paths=10, node_wipe=False, ne
     return paths, bottlenecks, fluxes
 
 
-def Dijkstra(sources, sinks, net_flux):
+def _Dijkstra(sources, sinks, net_flux):
     r""" A modified Dijkstra algorithm that dynamically computes the cost
     of all paths from A to B, weighted by NFlux.
 
