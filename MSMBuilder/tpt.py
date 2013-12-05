@@ -105,6 +105,10 @@ def get_top_path(sources, sinks, net_flux):
 
     _check_sources_sinks(sources, sinks)
 
+    if not scipy.sparse.issparse(net_flux):
+        logger.warn("only sparse matrices are currently supported.")
+        net_flux = scipy.sparse.lil_matrix(net_flux)
+
     net_flux = net_flux.tolil()
     n_states = net_flux.shape[0]
 
@@ -196,6 +200,10 @@ def get_paths(sources, sinks, net_flux, num_paths=np.inf, flux_cutoff=(1-1E-10))
     
     _check_sources_sinks(sources, sinks)
     
+    if not scipy.sparse.issparse(net_flux):
+        logger.warn("only sparse matrices are currently supported")
+        net_flux = scipy.sparse.lil_matrix(net_flux)
+
     net_flux = copy.deepcopy(net_flux.tolil())
     
     paths = []
@@ -209,6 +217,9 @@ def get_paths(sources, sinks, net_flux, num_paths=np.inf, flux_cutoff=(1-1E-10))
     expl_flux = 0.0
     while not_done:
         path, flux = get_top_path(sources, sinks, net_flux)
+        if np.isinf(flux):
+            logger.info("no more paths exist")
+            break
         
         paths.append(path)
         fluxes.append(flux)
@@ -221,14 +232,14 @@ def get_paths(sources, sinks, net_flux, num_paths=np.inf, flux_cutoff=(1-1E-10))
         counter += 1
         if counter >= num_paths or expl_flux >= flux_cutoff:
             break
-        
+
         # modify the net_flux matrix
         for k in xrange(len(path) - 1):
             net_flux[path[k], path[k+1]] -= flux
-    # since flux is the bottleneck, this will never be negative
-    # though... this might lead to CLOS which is bad...
-    # I'll fix this (^^^^) later.. for now let's get it working
-    
+        # since flux is the bottleneck, this will never be negative
+        # though... this might lead to CLOS which is bad...
+        # I'll fix this (^^^^) later.. for now let's get it working
+
     
     max_len = np.max([len(p) for p in paths])
     temp = np.ones((len(paths), max_len)) * -1
