@@ -25,6 +25,18 @@ import os
 import logging
 logger = logging.getLogger('msmbuilder.scripts.CalculateProjectSASA')
 
+parser = arglib.ArgumentParser(description="""Calculates the Solvent Accessible Surface Area
+    of all atoms in a subset of the trajectories, or for all trajectories in the project. The
+    output is a hdf5 file which contains the SASA for each atom in each frame
+    in each trajectory (or the single trajectory you passed in.""" )
+parser.add_argument('project')
+parser.add_argument('outdir', help=r"""Output directory to save .h5 files for each trajectory.
+    Each will be named sasa<index>.h5 where <index> corresponds to the project's index for that 
+    trajectory""", default='sasa')
+parser.add_argument('which', help="""which trajectories to calculate the SASA for.
+    This script saves a separate file for each trajectory.""", default=[0, np.inf],
+    nargs=2, type=int)
+
 def run(project, outdir, which):
 
     which[0] = np.max([0, which[0]])
@@ -53,18 +65,6 @@ def run(project, outdir, which):
 
 
 if __name__ == '__main__':
-    parser = arglib.ArgumentParser(description="""Calculates the Solvent Accessible Surface Area
-        of all atoms in a subset of the trajectories, or for all trajectories in the project. The
-        output is a hdf5 file which contains the SASA for each atom in each frame
-        in each trajectory (or the single trajectory you passed in.""" )
-    parser.add_argument('project')
-    parser.add_argument('outdir', help=r"""Output directory to save .h5 files for each trajectory.
-        Each will be named sasa<index>.h5 where <index> corresponds to the project's index for that 
-        trajectory""", default='sasa')
-    parser.add_argument('which', help="""which trajectories to calculate the SASA for.
-        This script saves a separate file for each trajectory.""", default=[0, np.inf],
-        nargs=2, type=int)
-
     args = parser.parse_args()
 
     if not os.path.exists(args.outdir):
