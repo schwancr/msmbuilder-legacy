@@ -53,10 +53,8 @@ def run(project, outdir, which):
             continue
 
         traj_fn = project.traj_filename(traj_ind)
-        chunk_ind = 0
         for traj_chunk in md.iterload(traj_fn, chunk=1000):
             traj_asa.extend(md.shrake_rupley(traj_chunk))
-            chunk_ind += 1
 
         traj_asa = np.array(traj_asa)
         io.saveh(out_fn, traj_asa)
