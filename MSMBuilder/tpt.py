@@ -81,6 +81,41 @@ def _check_sources_sinks(sources, sinks):
 # Path Finding Functions
 #
 
+def get_top_path_scipy(sources, sinks, net_flux)
+    """
+    Use the Dijkstra algorithm for finding the shortest path connecting
+    sources and sinks
+
+    Parameters
+    ----------
+    sources : array_like
+        nodes to define the source states
+    sinks : array_like
+        nodes to define the sink states
+    net_flux : scipy.sparse matrix
+        net flux of the MSM
+
+    Returns
+    -------
+    top_path : np.ndarray
+        array corresponding to the top path between sources and sinks
+    
+    """
+
+    _check_sources_sinks(sources, sinks)
+
+    if not scipy.sparse.issparse(net_flux):
+        logger.warn("only sparse matrices are currently supported.")
+        net_flux = scipy.sparse.lil_matrix(net_flux)
+
+    net_flux = net_flux.tolil()
+    n_states = net_flux.shape[0]
+
+    sources = np.array(sources, dtype=np.int).flatten()
+    sinks = np.array(sinks, dtype=np.int).flatten()
+
+    Q = list(sources) # nodes to check (the "queue")
+                      # going to use list.pop method so I can't keep it as an array
 
 def get_top_path(sources, sinks, net_flux):
     """
