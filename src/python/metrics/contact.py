@@ -114,7 +114,7 @@ class ContinuousContact(Vectorized, AbstractDistanceMetric):
             residue_to_alpha = np.zeros(num_residues)  # zero based indexing
             for i in range(num_atoms):
                 if trajectory.topology.atom(i).name == 'CA':
-                    residue = trajectory.topology.residue(i).index - 1
+                    residue = trajectory.topology.atom(i).residue.index - 1
                     residue_to_alpha[residue] = i
             # print 'contacts (residues)', contacts
             # print 'residue_to_alpja', residue_to_alpha.shape
