@@ -1,3 +1,6 @@
+from __future__ import print_function, absolute_import, division
+from mdtraj.utils.six.moves import xrange
+
 import os
 import numpy as np
 from mdtraj import io
@@ -26,10 +29,10 @@ parser.add_argument('states', nargs='+', type=int,
                     default=[-1])
 # nargs=+ means the values will come out as type list, but this isn't
 # naturally applied to the default, so we just put the default as [-1]
-parser.add_argument('format', choices=['pdb', 'xtc', 'lh5'],
+parser.add_argument('format', choices=['pdb', 'xtc', 'h5'],
                     help='''Format for the outputted conformations. PDB is the standard
     plaintext protein databank format. XTC is the gromacs binary trajectory
-    format, and lh5 is the MSMBuilder standard hdf5 based format''',
+    format, and h5 is the MDTraj hdf format''',
                     default='pdb')
 parser.add_argument('style', choices=['sep', 'tps', 'one'], help='''Controls
     the number of conformations save per file. If "sep" (SEPARATE), all of
@@ -81,7 +84,7 @@ def save(confs_by_state, states, style, format, outdir):
         raise ValueError('Invalid style: %s' % style)
 
 
-def main():
+def entry_point():
     """Parse command line inputs, load up files, then call run() and save() to do
     the real work"""
     parser.add_argument('output_dir', default='PDBs')
@@ -99,9 +102,8 @@ def main():
 
     # states
     if -1 in args.states:
-        n_states = len(np.unique(assignments[np.where(assignments != -1)]))
-        logger.info('Yanking from all %d states', n_states)
-        states = np.arange(n_states)
+        states = np.unique(assignments[np.where(assignments != -1)])
+        logger.info('Yanking from all %d states', len(states))
     else:
         # ensure that the states are sorted, and that they're unique -- you
         # can only request each state once
@@ -109,13 +111,13 @@ def main():
         logger.info("Yanking from the following states: %s", states)
 
     # extract the conformations using np.random for the randomness
-    confs_by_state = project.get_random_confs_from_states(assignments,
-                                                          states=states, num_confs=args.conformations_per_state,
-                                                          replacement=args.replacement)
+    confs_by_state = project.get_random_confs_from_states(
+        assignments, states=states, num_confs=args.conformations_per_state,
+        replacement=args.replacement)
 
     # save the conformations to disk, in the requested style
     save(confs_by_state=confs_by_state, states=states, style=args.style,
          format=args.format, outdir=args.output_dir)
 
 if __name__ == '__main__':
-    main()
+    entry_point()

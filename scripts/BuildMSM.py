@@ -82,6 +82,9 @@ def run(lagtime, assignments, symmetrize='MLE', input_mapping="None", trim=True,
     outputlist = [FnTProb, FnTCounts, FnMap, FnAss, FnPops]
     arglib.die_if_path_exists(outputlist)
 
+    # Check for valid lag time
+    assert lagtime > 0, 'Please specify a positive lag time.'
+
     # if given, apply mapping to assignments
     if input_mapping != "None":
         MSMLib.apply_mapping_to_assignments(assignments, input_mapping)
@@ -91,7 +94,7 @@ def run(lagtime, assignments, symmetrize='MLE', input_mapping="None", trim=True,
     counts = MSMLib.get_count_matrix_from_assignments(assignments, lag_time=lagtime, sliding_window=True)
 
     rev_counts, t_matrix, populations, mapping = MSMLib.build_msm(counts, symmetrize=symmetrize, ergodic_trimming=trim)
-    
+
     if trim:
         MSMLib.apply_mapping_to_assignments(assignments, mapping)
         n_assigns_after_trim = len(np.where(assignments.flatten() != -1)[0])
@@ -116,9 +119,9 @@ def run(lagtime, assignments, symmetrize='MLE', input_mapping="None", trim=True,
 
     return
 
-if __name__ == "__main__":
+def entry_point():
     args = parser.parse_args()
-
+    
     try:
         assignments = io.loadh(args.assignments, 'arr_0')
     except KeyError:
@@ -128,3 +131,7 @@ if __name__ == "__main__":
         args.mapping = np.array(np.loadtxt(args.mapping), dtype=int)
 
     run(args.lagtime, assignments, args.symmetrize, args.mapping, args.trim, args.output_dir)
+
+if __name__ == "__main__":
+    entry_point()
+    
