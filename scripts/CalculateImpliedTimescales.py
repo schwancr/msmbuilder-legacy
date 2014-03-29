@@ -59,6 +59,8 @@ def run(MinLagtime, MaxLagtime, Interval, NumEigen, AssignmentsFn, trimming,
     lagTimes = range(MinLagtime, MaxLagtime + 1, Interval)
     logger.info("Building MSMs at the following lag times: %s", lagTimes)
 
+    assert np.all(np.array(lagTimes) > 0), "Please specify a range of positive lag times."
+
     # Get the implied timescales (eigenvalues)
     impTimes = msm_analysis.get_implied_timescales(
         AssignmentsFn, lagTimes, n_implied_times=NumEigen, sliding_window=True,
@@ -66,7 +68,7 @@ def run(MinLagtime, MaxLagtime, Interval, NumEigen, AssignmentsFn, trimming,
     return impTimes
 
 
-if __name__ == "__main__":
+def entry_point():
     args = parser.parse_args()
     arglib.die_if_path_exists(args.output)
 
@@ -83,3 +85,6 @@ if __name__ == "__main__":
         (not args.notrim), args.symmetrize, args.procs)
     np.savetxt(args.output, impTimes)
     logger.info("Saved output to %s", args.output)
+
+if __name__ == '__main__':
+    entry_point()

@@ -62,7 +62,7 @@ def run(project, outdir, which):
     return 
 
 
-if __name__ == '__main__':
+def entry_point():
     args = parser.parse_args()
 
     if not os.path.exists(args.outdir):
@@ -72,4 +72,8 @@ if __name__ == '__main__':
         raise Exception("output directory (%s) exists but is not a directory!" % args.outdir)
 
     project = Project.load_from(args.project)
-    run(project, args.outdir, args.which)
+    SASA = run(project, atom_indices, args.traj_fn)
+    io.saveh(args.output, SASA)
+
+if __name__ == '__main__':
+    entry_point()

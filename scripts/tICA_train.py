@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from __future__ import print_function, absolute_import, division
+
 
 import logging
 import os
@@ -8,13 +10,14 @@ import numpy as np
 import scipy
 import mdtraj as md
 from mdtraj import io
+from mdtraj.utils.six.moves import xrange
 from msmbuilder import arglib
 from msmbuilder import Project
 from msmbuilder.reduce.tICA import tICA
 logger = logging.getLogger('msmbuilder.scripts.tICA_train')
 
 
-parser = arglib.ArgumentParser(get_basic_metric=True, description="""
+parser = arglib.ArgumentParser(get_metric=True, description="""
 Calculate the time-lag correlation and covariance matrices for use in the tICA
 metric. This method attempts to find projection vectors such that they have a
 maximal autocorrelation function.
@@ -77,7 +80,7 @@ def run(prep_metric, project, delta_time, atom_indices=None,
     return tica_obj
 
 
-if __name__ == '__main__':
+def entry_point():
     args, prep_metric = parser.parse_args()
     arglib.die_if_path_exists(args.output)
 
@@ -94,3 +97,6 @@ if __name__ == '__main__':
     tica_obj = run(
         prep_metric, project, args.delta_time, atom_indices=atom_indices,
         output=args.output, min_length=min_length, stride=args.stride)
+
+if __name__ == "__main__":
+    entry_point()
