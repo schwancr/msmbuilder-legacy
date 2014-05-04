@@ -88,7 +88,7 @@ class ContinuousContact(Vectorized, AbstractDistanceMetric):
         pairwise_distances : ndarray
             1D array of various residue-residue distances
         """
-        return md.compute_contacts(trajectory, self.contacts, self.scheme)
+        return md.compute_contacts(trajectory, self.contacts, self.scheme)[0]
 
 
 class BooleanContact(Vectorized, AbstractDistanceMetric):
