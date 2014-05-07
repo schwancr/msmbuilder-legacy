@@ -112,7 +112,7 @@ def get_reversible_eigenvectors(t_matrix, k, populations=None, right=False,
     symtrans = root_pi_diag.dot(scipy.sparse.csr_matrix(t_matrix)).dot(root_pi_diag_inv)  # Force temporary conversion to sparse
 
     if scipy.sparse.issparse(t_matrix):
-        values, vectors = scipy.sparse.linalg.eigsh(symtrans.T, k=k, which='LA', **kwargs)
+        values, vectors = scipy.sparse.linalg.eigsh(symtrans, k=k, which='LA', **kwargs)
     else:
         values, vectors = np.linalg.eigh(symtrans.toarray())
 
