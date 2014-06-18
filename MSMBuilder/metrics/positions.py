@@ -60,6 +60,11 @@ class Positions(Vectorized, AbstractDistanceMetric):
 
         self.target = target
         self.target.center_coordinates()
+        if self.align_indices is None:
+            self._permute_groups = [[i] for i in xrange(self.target.n_atoms)]
+
+        else:
+            slf._permute_groups = [[i] for i in self.align_indices]
 
 
     def prepare_trajectory(self, trajectory, return_dist=False):
@@ -86,9 +91,9 @@ class Positions(Vectorized, AbstractDistanceMetric):
         """
 
         t = md.Trajectory(trajectory.xyz.copy(), topology=trajectory.topology.copy())
-        t.center_coordinates()
 
-        distances = md.lprmsd(t, self.target, superpose=True, atom_indices=self.align_indices)
+        distances = md.lprmsd(t, self.target, superpose=True, atom_indices=self.align_indices,
+                              permute_groups=self._permute_groups)
 
         prep_trajectory = t.xyz[:, self.atom_indices].reshape((len(t), -1))
 
