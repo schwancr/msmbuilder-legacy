@@ -14,6 +14,7 @@ import _lprmsd
 import mdtraj as md
 
 from collections import namedtuple
+import copy
 import numpy as np
 import itertools
 from scipy import optimize
@@ -82,6 +83,7 @@ class TheoData(object):
             NumConfs = len(XYZData)
             NumAtoms = XYZData.shape[1]
 
+            XYZData = copy.copy(XYZData)
             self.centerConformations(XYZData)
 
             NumAtomsWithPadding = 4 + NumAtoms - NumAtoms % 4
@@ -111,7 +113,7 @@ class TheoData(object):
         # to keep the dimensions right, we make everything a slice
         if isinstance(key, int):
             key = slice(key, key+1)
-        return RMSD.TheoData(self.XYZData[key], NumAtoms=self.NumAtoms, G=self.G[key])
+        return TheoData(self.XYZData[key], NumAtoms=self.NumAtoms, G=self.G[key])
 
     def __setitem__(self, key, value):
         self.XYZData[key] = value.XYZData
