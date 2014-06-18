@@ -13,6 +13,7 @@ from msmbuilder.metrics import RMSD
 import _lprmsd
 import mdtraj as md
 
+from collections import namedtuple
 import numpy as np
 import itertools
 from scipy import optimize
