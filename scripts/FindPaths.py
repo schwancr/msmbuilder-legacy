@@ -50,7 +50,9 @@ parser.add_argument('output', default='Paths.h5')
 
 def run(tprob, sources, sinks, num_paths):
 
-    paths, fluxes = tpt.find_top_paths(sources, sinks, tprob, num_paths=num_paths)
+    net_flux = tpt.calculate_net_fluxes(sources, sinks, tprob)
+
+    paths, fluxes = tpt.get_paths(sources, sinks, net_flux, num_paths=num_paths)
 
     # We have to pad the paths with -1s to make a square array
     max_length = np.max([len(p) for p in paths])

@@ -30,8 +30,8 @@ that cover the same concepts.
 
 References
 ----------
-.. [1] Metzner, P., Schutte, C. & Vanden-Eijnden, E. Transition path theory 
-       for Markov jump processes. Multiscale Model. Simul. 7, 1192–1219 
+.. [1] Metzner, P., Schutte, C. & Vanden-Eijnden, E. Transition path theory
+       for Markov jump processes. Multiscale Model. Simul. 7, 1192-1219
        (2009).
 .. [2] Berezhkovskii, A., Hummer, G. & Szabo, A. Reactive flux and folding 
        pathways in network models of coarse-grained protein dynamics. J. 
@@ -81,7 +81,7 @@ def _check_sources_sinks(sources, sinks):
 # Path Finding Functions
 #
 
-def get_top_path_scipy(sources, sinks, net_flux)
+def get_top_path_scipy(sources, sinks, net_flux):
     """
     Use the Dijkstra algorithm for finding the shortest path connecting
     sources and sinks
@@ -153,7 +153,7 @@ def get_top_path(sources, sinks, net_flux):
     Q = list(sources) # nodes to check (the "queue")
                       # going to use list.pop method so I can't keep it as an array
     visited = np.zeros(n_states).astype(np.bool) # have we already checked this node?
-    previous_node = np.ones(n_states) * -1 # what node was found before finding this one
+    previous_node = np.ones(n_states).astype(np.int) * -1 # what node was found before finding this one
     min_fluxes = np.ones(n_states) * -1 * np.inf # what is the flux of the highest flux path
                                             # from this node to the source set.
 
@@ -195,7 +195,7 @@ def get_top_path(sources, sinks, net_flux):
 
     top_path = []
     # populate the path in reverse
-    top_path.append(sinks[min_fluxes[sinks].argmax()])
+    top_path.append(int(sinks[min_fluxes[sinks].argmax()]))
     # find the closest sink state
 
     while previous_node[top_path[-1]] != -1:
@@ -261,10 +261,9 @@ def get_paths(sources, sinks, net_flux, num_paths=np.inf, flux_cutoff=(1-1E-10))
         
         expl_flux += flux / total_flux
         
-        logger.info("Found %s" % str(path.astype(int)))
-        logger.info("\twith flux %.4e (%.2f%% of total)" % (flux, expl_flux * 100))
-        
         counter += 1
+        logger.info("Found next path (%d) with flux %.4e (%.2f%% of total)" % (counter, flux, expl_flux * 100))
+        
         if counter >= num_paths or expl_flux >= flux_cutoff:
             break
 
@@ -393,7 +392,7 @@ def _find_top_paths_cut(sources, sinks, tprob, num_paths=10, node_wipe=False, ne
     References
     ----------
     .. [1] Dijkstra, E. W. (1959). "A note on two problems in connexion with 
-           graphs". Numerische Mathematik 1: 269–271. doi:10.1007/BF01386390.
+           graphs." Numerische Mathematik 1: 269-271. doi:10.1007/BF01386390.
     """
 
     # first, do some checking on the input, esp. `sources` and `sinks`
@@ -496,7 +495,7 @@ def _Dijkstra(sources, sinks, net_flux):
      References
      ----------
      .. [1] Dijkstra, E. W. (1959). "A note on two problems in connexion with 
-            graphs". Numerische Mathematik 1: 269–271. doi:10.1007/BF01386390.
+            graphs." Numerische Mathematik 1: 269-271. doi:10.1007/BF01386390.
     """
 
     sources, sinks = _check_sources_sinks(sources, sinks)
@@ -692,7 +691,7 @@ def find_path_bottleneck(path, net_flux):
      References
      ----------
      .. [1] Metzner, P., Schutte, C. & Vanden-Eijnden, E. Transition path theory 
-            for Markov jump processes. Multiscale Model. Simul. 7, 1192–1219 
+            for Markov jump processes. Multiscale Model. Simul. 7, 1192-1219
             (2009).
      .. [2] Berezhkovskii, A., Hummer, G. & Szabo, A. Reactive flux and folding 
             pathways in network models of coarse-grained protein dynamics. J. 
@@ -743,7 +742,7 @@ def calculate_fluxes(sources, sinks, tprob, populations=None, committors=None):
     References
     ----------
     .. [1] Metzner, P., Schutte, C. & Vanden-Eijnden, E. Transition path theory 
-           for Markov jump processes. Multiscale Model. Simul. 7, 1192–1219 
+           for Markov jump processes. Multiscale Model. Simul. 7, 1192-1219
            (2009).
     .. [2] Berezhkovskii, A., Hummer, G. & Szabo, A. Reactive flux and folding 
            pathways in network models of coarse-grained protein dynamics. J. 
@@ -828,7 +827,7 @@ def calculate_net_fluxes(sources, sinks, tprob, populations=None, committors=Non
     References
     ----------
     .. [1] Metzner, P., Schutte, C. & Vanden-Eijnden, E. Transition path theory 
-           for Markov jump processes. Multiscale Model. Simul. 7, 1192–1219 
+           for Markov jump processes. Multiscale Model. Simul. 7, 1192-1219
            (2009).
     .. [2] Berezhkovskii, A., Hummer, G. & Szabo, A. Reactive flux and folding 
            pathways in network models of coarse-grained protein dynamics. J. 
@@ -895,7 +894,7 @@ def calculate_ensemble_mfpt(sources, sinks, tprob, lag_time):
     References
     ----------
     .. [1] Metzner, P., Schutte, C. & Vanden-Eijnden, E. Transition path theory 
-           for Markov jump processes. Multiscale Model. Simul. 7, 1192–1219 
+           for Markov jump processes. Multiscale Model. Simul. 7, 1192-1219
            (2009).
     .. [2] Berezhkovskii, A., Hummer, G. & Szabo, A. Reactive flux and folding 
            pathways in network models of coarse-grained protein dynamics. J. 
@@ -945,7 +944,7 @@ def calculate_avg_TP_time(sources, sinks, tprob, lag_time):
     References
     ----------
     .. [1] Metzner, P., Schutte, C. & Vanden-Eijnden, E. Transition path theory 
-           for Markov jump processes. Multiscale Model. Simul. 7, 1192–1219 
+           for Markov jump processes. Multiscale Model. Simul. 7, 1192-1219 
            (2009).
     .. [2] Berezhkovskii, A., Hummer, G. & Szabo, A. Reactive flux and folding 
            pathways in network models of coarse-grained protein dynamics. J. 
@@ -1013,7 +1012,7 @@ def calculate_mfpt(sinks, tprob, lag_time=1.):
     References
     ----------
     .. [1] Metzner, P., Schutte, C. & Vanden-Eijnden, E. Transition path theory 
-           for Markov jump processes. Multiscale Model. Simul. 7, 1192–1219 
+           for Markov jump processes. Multiscale Model. Simul. 7, 1192-1219 
            (2009).
     .. [2] Berezhkovskii, A., Hummer, G. & Szabo, A. Reactive flux and folding 
            pathways in network models of coarse-grained protein dynamics. J. 
@@ -1080,7 +1079,7 @@ def calculate_all_to_all_mfpt(tprob, populations=None):
     References
     ----------
     .. [1] Metzner, P., Schutte, C. & Vanden-Eijnden, E. Transition path theory 
-           for Markov jump processes. Multiscale Model. Simul. 7, 1192–1219 
+           for Markov jump processes. Multiscale Model. Simul. 7, 1192-1219 
            (2009).
     .. [2] Berezhkovskii, A., Hummer, G. & Szabo, A. Reactive flux and folding 
            pathways in network models of coarse-grained protein dynamics. J. 
@@ -1140,7 +1139,7 @@ def calculate_committors(sources, sinks, tprob):
     References
     ----------
     .. [1] Metzner, P., Schutte, C. & Vanden-Eijnden, E. Transition path theory 
-           for Markov jump processes. Multiscale Model. Simul. 7, 1192–1219 
+           for Markov jump processes. Multiscale Model. Simul. 7, 1192-1219 
            (2009).
     .. [2] Berezhkovskii, A., Hummer, G. & Szabo, A. Reactive flux and folding 
            pathways in network models of coarse-grained protein dynamics. J. 
