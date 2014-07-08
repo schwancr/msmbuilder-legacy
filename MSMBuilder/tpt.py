@@ -206,32 +206,32 @@ def get_top_path(sources, sinks, net_flux):
 
 def get_paths(sources, sinks, net_flux, num_paths=np.inf, flux_cutoff=(1-1E-10)):
     """
-        Get the top N paths by iteratively performing Dijkstra's
-        algorithm, but at each step modifying the net flux matrix
-        by subtracting the previously found path's flux from each
-        edge in that path.
-        
-        Parameters
-        ----------
-        sources : array_like
+    Get the top N paths by iteratively performing Dijkstra's
+    algorithm, but at each step modifying the net flux matrix
+    by subtracting the previously found path's flux from each
+    edge in that path.
+    
+    Parameters
+    ----------
+    sources : array_like
         nodes to define the source states
-        sinks : array_like
+    sinks : array_like
         nodes to define the sink states
-        net_flux : scipy.sparse matrix
+    net_flux : scipy.sparse matrix
         net flux of the MSM
-        num_paths : int, optional
+    num_paths : int, optional
         number of paths to find
-        flux_cutoff : float, optional
+    flux_cutoff : float, optional
         quit finding paths once the explained flux is greater
         this cutoff (as a percentage of the total)
-        
-        Returns
-        -------
-        paths : np.ndarray
+    
+    Returns
+    -------
+    paths : np.ndarray
         list of paths
-        fluxes : np.ndarray
+    fluxes : np.ndarray
         flux of each path returned
-        """
+    """
     
     _check_sources_sinks(sources, sinks)
     
