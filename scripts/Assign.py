@@ -43,6 +43,9 @@ parser.add_argument( dest='generators', help='''Output trajectory file containin
     the structures of each of the cluster centers. Note that for hierarchical clustering
     methods, this file will not be produced.''', default='Data/Gens.h5')
 parser.add_argument('output_dir')
+parser.add_argument('traj_indices', default=None, help="""a filename with a line 
+    for each trajectory in your project. Each line contains two indices corresponding
+    to an interval of the frames to use in the calculation [a, b)""")
 
 
 def main(args, metric):
@@ -52,6 +55,11 @@ def main(args, metric):
     # arglib.die_if_path_exists(args.output_dir)
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
+
+    if args.traj_indices is None:
+        traj_indices = None
+    else:
+        traj_indices = np.loadtxt(args.traj_indices).astype(int)
 
     project = Project.load_from(args.project)
     gens = md.load(args.generators)
@@ -87,10 +95,11 @@ def main(args, metric):
         metric.atomindices = None
         # this runs assignment and prints them to disk
         assign_with_checkpoint(metric, project, gens, assignments_path,
-                               distances_path, atom_indices_to_load=atom_indices)
+                               distances_path, atom_indices_to_load=atom_indices,
+                               traj_indices=traj_indices)
     else:
         assign_with_checkpoint(metric, project, gens, assignments_path,
-                               distances_path)
+                               distances_path, traj_indices=traj_indices)
 
     logger.info('All Done!')
 
