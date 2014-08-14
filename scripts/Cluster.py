@@ -52,6 +52,9 @@ parser.add_argument('output_dir', help='''Output directory to save clustering da
     (4) ZMatrix.h5 (If clustering is hierarchical):
         This is the ZMatrix corresponding to the result of hierarchical clustering.
         use it with AssignHierarchical.py to build your assignments file.''')
+parser.add_argument('traj_indices', default=None, help="""a filename with a line 
+    for each trajectory in your project. Each line contains two indices corresponding
+    to an interval of the frames to use in the calculation [a, b)""")
 
 ################################################################################
 
@@ -114,7 +117,7 @@ for metric_parser in parser.metric_parser_list: # arglib stores the metric subpa
         choices=['single', 'complete', 'average', 'weighted', 'centroid', 'median', 'ward'], dest='hierarchical_method')
 
 
-def load_prep_trajectories(project, stride, atom_indices, metric):
+def load_prep_trajectories(project, stride, atom_indices, metric, traj_indices=None):
     """load the trajectories but prepare them during the load.
     This is helpful for metrics that use dimensionality reduction
     so you can use more frames without a MemoryError
@@ -123,12 +126,19 @@ def load_prep_trajectories(project, stride, atom_indices, metric):
     which = []
     for i in xrange(project.n_trajs):
 
-        which_frames = np.arange(0, project.traj_lengths[i], stride)
+        if traj_indices is None:
+            which_frames = np.arange(0, project.traj_lengths[i], stride)
+        else:
+            which_frames = np.arange(traj_indices[i][0], traj_indices[i][1], stride)
 
         which.extend(zip([i] * len(which_frames), which_frames))
 
         ptraj = []
         for chunk in md.iterload(project.traj_filename(i), stride=stride, atom_indices=atom_indices):
+            if not traj_indices is None:
+                a, b = traj_indices[i] / stride
+                # integer arithmetic should be correct when the index is not a multiple of stride
+                chunk = chunk[a:b]
             ptrj_chunk = metric.prepare_trajectory(chunk)
             ptraj.append(ptrj_chunk)
 
@@ -137,14 +147,17 @@ def load_prep_trajectories(project, stride, atom_indices, metric):
 
     return list_of_ptrajs, np.array(which)
 
-def load_trajectories(project, stride, atom_indices):
+def load_trajectories(project, stride, atom_indices, traj_indices=None):
 
     list_of_trajs = []
     for i in xrange(project.n_trajs):
         # note, LoadTraj is only using the fast strided loading for
         # HDF5 formatted trajs
         traj = project.load_traj(i, stride=stride, atom_indices=atom_indices)
-        
+        if not traj_indices is None:
+            a, b = traj_indices[i] / stride
+            traj = traj[a:b]
+
         if atom_indices != None:
             assert len(atom_indices) == traj.n_atoms
         
@@ -232,6 +245,11 @@ could stride a little at the begining, but its not recommended.""")
             distances_fn = os.path.join(args.output_dir, 'Assignments.h5.distances')
             die_if_path_exists([assignments_fn, distances_fn])
         
+    if args.traj_indices is None:
+        traj_indices = None
+    else:
+        traj_indices = np.loadtxt(args.traj_indices).astype(int)
+
     project = Project.load_from(args.project)
 
     if isinstance(metric, metrics.Vectorized) and not args.alg == 'hierarchical': 
@@ -239,7 +257,7 @@ could stride a little at the begining, but its not recommended.""")
         # we can load prepared trajectories 
         # which may allow for better memory
         # efficiency
-        ptrajs, which = load_prep_trajectories(project, args.stride, atom_indices, metric)
+        ptrajs, which = load_prep_trajectories(project, args.stride, atom_indices, metric, traj_indices)
         trajectories = None
         n_trajs = len(ptrajs)
 
@@ -247,7 +265,7 @@ could stride a little at the begining, but its not recommended.""")
         if num_frames != len(which):
             raise Exception("something went wrong in loading step (%d v %d)" % (num_frames, len(which)))
     else:
-        trajectories = load_trajectories(project, args.stride, atom_indices)       
+        trajectories = load_trajectories(project, args.stride, atom_indices, traj_indices)
         ptrajs = None
         which = None
         n_trajs = len(trajectories)
