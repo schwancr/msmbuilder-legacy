@@ -75,7 +75,7 @@ def run(prep_metric, project, delta_time, atom_indices=None,
         traj_chunk = md.load(project.traj_filename(
             i), stride=stride, atom_indices=atom_indices)
 
-        if not args.traj_indices is None:
+        if not traj_indices is None:
             a, b = traj_indices[i] / stride 
             # integer arithmetic should truncate correctly when
             # the indices are not multiples of the stride
