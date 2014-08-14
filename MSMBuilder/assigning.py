@@ -122,7 +122,8 @@ def assign_in_memory(metric, generators, project, atom_indices_to_load=None):
 
 
 def assign_with_checkpoint(metric, project, generators, assignments_path,
-                           distances_path, chunk_size=10000, atom_indices_to_load=None):
+                           distances_path, chunk_size=10000, atom_indices_to_load=None,
+                           traj_indices=None):
     """
     Assign every frame to its closest generator
 
@@ -157,6 +158,10 @@ def assign_with_checkpoint(metric, project, generators, assignments_path,
         object (above). So if the generators are already subsampled to a restricted
         set of atom indices, but the trajectories on disk are NOT, you'll
         need to pass in a set of indices here to resolve the difference.
+    traj_indices : np.ndarray, optional
+        an array with a row for each trajectory in your project. 
+        Each item contains two indices corresponding
+        to an interval of the frames to use in the calculation [a, b)
 
     See Also
     --------
@@ -192,6 +197,20 @@ def assign_with_checkpoint(metric, project, generators, assignments_path,
                        "traj we're trying to assign! Maybe check atom indices?")
                 raise ValueError(msg)
 
+            if not traj_indices is None:
+                a, b = traj_indices[i]
+                if (start_index + len(tchunk)) < a:
+                    # we haven't gotten to the first desired index yet
+                    continue
+
+                if (start_index >= b):
+                    # we've already gone through all of the data we wanted to
+                    break
+
+            else:
+                a = 0
+                b = project.traj_lengths[i]
+
             ptchunk = metric.prepare_trajectory(tchunk)
 
             this_length = len(ptchunk)
@@ -199,15 +218,21 @@ def assign_with_checkpoint(metric, project, generators, assignments_path,
             distances = np.empty(this_length, dtype=np.float32)
             assignments = np.empty(this_length, dtype=np.int)
 
-            for j in xrange(this_length):
+            for j in xrange(this_length):   
+                if ((start_index + j) < a) or ((start_index + j) >= b):
+                    assignments[j] = -1
+                    distances[j] = -1
+                    continue
+
                 d = metric.one_to_all(ptchunk, pgens, j)
                 ind = np.argmin(d)
                 assignments[j] = ind
                 distances[j] = d[ind]
 
             end_index = start_index + this_length
-            fh_a.root.arr_0[i, start_index:end_index] = assignments
-            fh_d.root.arr_0[i, start_index:end_index] = distances
+            fh_a.root.arr_0[i, np.max([start_index, a]):np.min([end_index, b])] = assignments
+            fh_d.root.arr_0[i, np.max([start_index, a]):np.min([end_index, b])] = distances
+            # only save the points that are greater than a and less than b
 
             # i'm not sure exactly what the optimal flush frequency is
             fh_a.flush()
