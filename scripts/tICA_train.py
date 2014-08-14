@@ -37,10 +37,13 @@ parser.add_argument('delta_time', type=int, help="""delta time to
 parser.add_argument('min_length', type=int, default=0,
                     help="""only train on trajectories greater than <min_length> 
     number of frames""")
+parser.add_argument('traj_indices', default=None, help="""a filename with a line 
+    for each trajectory in your project. Each line contains two indices corresponding
+    to an interval of the frames to use in the calculation [a, b)""")
 
 
 def run(prep_metric, project, delta_time, atom_indices=None,
-        output='tICAData.h5', min_length=0, stride=1):
+        output='tICAData.h5', min_length=0, stride=1, traj_indices=None):
 
     # We will load the trajectories at the stride, so we need to find
     # what dt should be once we've strided by some amount
@@ -71,6 +74,13 @@ def run(prep_metric, project, delta_time, atom_indices=None,
         # at least for long trajectories
         traj_chunk = md.load(project.traj_filename(
             i), stride=stride, atom_indices=atom_indices)
+
+        if not args.traj_indices is None:
+            a, b = traj_indices[i] / stride 
+            # integer arithmetic should truncate correctly when
+            # the indices are not multiples of the stride
+            traj_chunk = traj_chunk[a:b]
+
         tica_obj.train(trajectory=traj_chunk)
 
     tica_obj.solve()
@@ -94,9 +104,15 @@ def entry_point():
     # need to convert to float first because int can't
     # convert a string that is '1E3' for example...weird.
 
+    if not args.traj_indices is None:
+        traj_indices = np.loadtxt(args.traj_indices).astype(int)
+    else:
+        traj_indices = None
+
     tica_obj = run(
         prep_metric, project, args.delta_time, atom_indices=atom_indices,
-        output=args.output, min_length=min_length, stride=args.stride)
+        output=args.output, min_length=min_length, stride=args.stride,
+        traj_indices=traj_indices)
 
 if __name__ == "__main__":
     entry_point()
