@@ -52,7 +52,7 @@ parser.add_argument('output_dir', help='''Output directory to save clustering da
     (4) ZMatrix.h5 (If clustering is hierarchical):
         This is the ZMatrix corresponding to the result of hierarchical clustering.
         use it with AssignHierarchical.py to build your assignments file.''')
-parser.add_argument('traj_indices', default=None, help="""a filename with a line 
+parser.add_argument('traj_indices', default='none', help="""a filename with a line 
     for each trajectory in your project. Each line contains two indices corresponding
     to an interval of the frames to use in the calculation [a, b)""")
 
@@ -134,18 +134,32 @@ def load_prep_trajectories(project, stride, atom_indices, metric, traj_indices=N
         which.extend(zip([i] * len(which_frames), which_frames))
 
         ptraj = []
+        start_ind = 0
         for chunk in md.iterload(project.traj_filename(i), stride=stride, atom_indices=atom_indices):
+            n = len(chunk)
             if not traj_indices is None:
-                a, b = traj_indices[i] / stride
+                a, b = [int(x) for x in traj_indices[i] / stride]
                 # integer arithmetic should be correct when the index is not a multiple of stride
-                chunk = chunk[a:b]
+
+                if (start_ind + n) < a:
+                    continue
+
+                if start_ind >= b:
+                    break
+                
+                i0 = np.max([0, a - start_ind])
+                i1 = np.min([n, b - start_ind])
+                chunk = chunk[i0:i1]
+            
             ptrj_chunk = metric.prepare_trajectory(chunk)
             ptraj.append(ptrj_chunk)
+            start_ind += n
 
         ptraj = np.concatenate(ptraj)
         list_of_ptrajs.append(ptraj)
 
     return list_of_ptrajs, np.array(which)
+
 
 def load_trajectories(project, stride, atom_indices, traj_indices=None):
 
@@ -245,7 +259,7 @@ could stride a little at the begining, but its not recommended.""")
             distances_fn = os.path.join(args.output_dir, 'Assignments.h5.distances')
             die_if_path_exists([assignments_fn, distances_fn])
         
-    if args.traj_indices is None:
+    if args.traj_indices.lower() is 'none':
         traj_indices = None
     else:
         traj_indices = np.loadtxt(args.traj_indices).astype(int)
@@ -257,7 +271,7 @@ could stride a little at the begining, but its not recommended.""")
         # we can load prepared trajectories 
         # which may allow for better memory
         # efficiency
-        ptrajs, which = load_prep_trajectories(project, args.stride, atom_indices, metric, traj_indices)
+        ptrajs, which = load_prep_trajectories(project, args.stride, atom_indices, metric, traj_indices=traj_indices)
         trajectories = None
         n_trajs = len(ptrajs)
 
@@ -265,7 +279,7 @@ could stride a little at the begining, but its not recommended.""")
         if num_frames != len(which):
             raise Exception("something went wrong in loading step (%d v %d)" % (num_frames, len(which)))
     else:
-        trajectories = load_trajectories(project, args.stride, atom_indices, traj_indices)
+        trajectories = load_trajectories(project, args.stride, atom_indices, traj_indices=traj_indices)
         ptrajs = None
         which = None
         n_trajs = len(trajectories)
@@ -288,11 +302,16 @@ could stride a little at the begining, but its not recommended.""")
         if args.stride == 1:
             assignments = clusterer.get_assignments()
             distances = clusterer.get_distances()
-            
+
+            assignments_all = -1 * np.ones((project.n_trajs, np.max(project.traj_lengths)), dtype=np.int)
+            distances_all = -1 * np.ones((project.n_trajs, np.max(project.traj_lengths)))
+            assignments_all[:, :assignments.shape[1]] = assignments
+            distances_all[:, :distances.shape[1]] = distances
+    
             logger.info('Since stride=1, Saving %s', assignments_fn)
             logger.info('Since stride=1, Saving %s', distances_fn)
-            io.saveh(assignments_fn, assignments)
-            io.saveh(distances_fn, distances)
+            io.saveh(assignments_fn, assignments_all)
+            io.saveh(distances_fn, distances_all)
 
 
 def entry_point():

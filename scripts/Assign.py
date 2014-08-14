@@ -43,7 +43,7 @@ parser.add_argument( dest='generators', help='''Output trajectory file containin
     the structures of each of the cluster centers. Note that for hierarchical clustering
     methods, this file will not be produced.''', default='Data/Gens.h5')
 parser.add_argument('output_dir')
-parser.add_argument('traj_indices', default=None, help="""a filename with a line 
+parser.add_argument('traj_indices', default='none', help="""a filename with a line 
     for each trajectory in your project. Each line contains two indices corresponding
     to an interval of the frames to use in the calculation [a, b)""")
 
@@ -56,7 +56,7 @@ def main(args, metric):
     if not os.path.exists(args.output_dir):
         os.mkdir(args.output_dir)
 
-    if args.traj_indices is None:
+    if args.traj_indices.lower() == 'none':
         traj_indices = None
     else:
         traj_indices = np.loadtxt(args.traj_indices).astype(int)

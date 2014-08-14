@@ -201,6 +201,7 @@ def assign_with_checkpoint(metric, project, generators, assignments_path,
                 a, b = traj_indices[i]
                 if (start_index + len(tchunk)) < a:
                     # we haven't gotten to the first desired index yet
+                    start_index += len(tchunk)
                     continue
 
                 if (start_index >= b):
@@ -230,8 +231,8 @@ def assign_with_checkpoint(metric, project, generators, assignments_path,
                 distances[j] = d[ind]
 
             end_index = start_index + this_length
-            fh_a.root.arr_0[i, np.max([start_index, a]):np.min([end_index, b])] = assignments
-            fh_d.root.arr_0[i, np.max([start_index, a]):np.min([end_index, b])] = distances
+            fh_a.root.arr_0[i, np.max([start_index, a]):np.min([end_index, b])] = assignments[np.min([a - start_index, 0]):np.min([b - start_index, this_length])]
+            fh_d.root.arr_0[i, np.max([start_index, a]):np.min([end_index, b])] = distances[np.min([a - start_index, 0]):np.min([b - start_index, this_length])]
             # only save the points that are greater than a and less than b
 
             # i'm not sure exactly what the optimal flush frequency is
