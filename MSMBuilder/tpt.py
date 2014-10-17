@@ -262,7 +262,7 @@ def get_paths(sources, sinks, net_flux, num_paths=np.inf, flux_cutoff=(1-1E-10))
         expl_flux += flux / total_flux
         
         counter += 1
-        logger.info("Found next path (%d) with flux %.4e (%.2f%% of total)" % (counter, flux, expl_flux * 100))
+        logger.debug("Found next path (%d) with flux %.4e (%.2f%% of total)" % (counter, flux, expl_flux * 100))
         
         if counter >= num_paths or expl_flux >= flux_cutoff:
             break
